@@ -1,94 +1,147 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { View, StyleSheet, ScrollView, Alert } from 'react-native';
+import { Text, Switch, Button, Chip } from 'react-native-paper';
 import { router } from 'expo-router';
-import { useOnboarding } from '@/context/onboarding';
+import { useAuth } from '@/context/auth';
+import { supabase } from '@/lib/supabase';
 
-const DIETARY_PREFERENCES = ['Vegetarian', 'Vegan', 'Gluten-free', 'Dairy-free'] as const;
-const DIET_STYLES = ['Keto', 'Low-carb', 'Mediterranean', 'None'] as const;
+const DIET_STYLES = [
+  { label: 'None', value: 'None' },
+  { label: 'Keto', value: 'Keto' },
+  { label: 'Low-carb', value: 'Low-carb' },
+  { label: 'Mediterranean', value: 'Mediterranean' },
+  { label: 'Paleo', value: 'Paleo' },
+];
 
-export default function DietaryPreferencesScreen() {
-  const { data, setDietaryPreferences } = useOnboarding();
-  const [selectedPreferences, setSelectedPreferences] = useState<Set<typeof DIETARY_PREFERENCES[number]>>(
-    new Set(data.dietaryPreferences)
-  );
-  const [selectedStyle, setSelectedStyle] = useState<typeof DIET_STYLES[number]>(
-    data.dietStyle || 'None'
-  );
+export default function DietaryPreferences() {
+  const { session } = useAuth();
+  const [isVegetarian, setIsVegetarian] = useState(false);
+  const [isVegan, setIsVegan] = useState(false);
+  const [isGlutenFree, setIsGlutenFree] = useState(false);
+  const [isDairyFree, setIsDairyFree] = useState(false);
+  const [dietStyle, setDietStyle] = useState('None');
+  const [isSaving, setIsSaving] = useState(false);
 
-  const togglePreference = (preference: typeof DIETARY_PREFERENCES[number]) => {
-    setSelectedPreferences(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(preference)) {
-        newSet.delete(preference);
-      } else {
-        newSet.add(preference);
-      }
-      return newSet;
-    });
-  };
+  const handleNext = async () => {
+    if (!session?.user) {
+      Alert.alert('Error', 'You must be logged in');
+      return;
+    }
 
-  const handleNext = () => {
-    setDietaryPreferences(Array.from(selectedPreferences), selectedStyle);
-    router.push('/(onboarding)/macro-goals');
+    setIsSaving(true);
+    try {
+      const { error } = await supabase
+        .from('user_dietary_preferences')
+        .upsert({
+          user_id: session.user.id,
+          is_vegetarian: isVegetarian,
+          is_vegan: isVegan,
+          is_gluten_free: isGlutenFree,
+          is_dairy_free: isDairyFree,
+          diet_style: dietStyle,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      console.log('Dietary preferences saved successfully');
+      router.push('/(onboarding)/macro-goals');
+    } catch (error: any) {
+      console.error('Error saving dietary preferences:', error);
+      Alert.alert('Error', error.message || 'Failed to save dietary preferences');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
     <ScrollView style={styles.container}>
       <View style={styles.content}>
-        <Text style={styles.title}>Dietary Preferences</Text>
+        <Text variant="headlineMedium" style={styles.title}>
+          Dietary Preferences
+        </Text>
+        <Text variant="bodyLarge" style={styles.subtitle}>
+          Help us understand your dietary needs
+        </Text>
 
-        <Text style={styles.sectionTitle}>Restrictions</Text>
-        <View style={styles.preferencesContainer}>
-          {DIETARY_PREFERENCES.map((preference) => (
-            <TouchableOpacity
-              key={preference}
-              style={[
-                styles.preferenceButton,
-                selectedPreferences.has(preference) && styles.preferenceButtonSelected,
-              ]}
-              onPress={() => togglePreference(preference)}
-            >
-              <Text
-                style={[
-                  styles.preferenceButtonText,
-                  selectedPreferences.has(preference) && styles.preferenceButtonTextSelected,
-                ]}
-              >
-                {preference}
-              </Text>
-            </TouchableOpacity>
-          ))}
+        {/* Dietary Restrictions */}
+        <View style={styles.section}>
+          <Text variant="titleMedium" style={styles.sectionTitle}>
+            Dietary Restrictions
+          </Text>
+          
+          <View style={styles.switchContainer}>
+            <View style={styles.switchRow}>
+              <Text variant="bodyLarge">Vegetarian</Text>
+              <Switch
+                value={isVegetarian}
+                onValueChange={setIsVegetarian}
+                disabled={isSaving}
+              />
+            </View>
+
+            <View style={styles.switchRow}>
+              <Text variant="bodyLarge">Vegan</Text>
+              <Switch
+                value={isVegan}
+                onValueChange={setIsVegan}
+                disabled={isSaving}
+              />
+            </View>
+
+            <View style={styles.switchRow}>
+              <Text variant="bodyLarge">Gluten-free</Text>
+              <Switch
+                value={isGlutenFree}
+                onValueChange={setIsGlutenFree}
+                disabled={isSaving}
+              />
+            </View>
+
+            <View style={styles.switchRow}>
+              <Text variant="bodyLarge">Dairy-free</Text>
+              <Switch
+                value={isDairyFree}
+                onValueChange={setIsDairyFree}
+                disabled={isSaving}
+              />
+            </View>
+          </View>
         </View>
 
-        <Text style={styles.sectionTitle}>Diet Style</Text>
-        <View style={styles.dietStylesContainer}>
-          {DIET_STYLES.map((style) => (
-            <TouchableOpacity
-              key={style}
-              style={[
-                styles.dietStyleButton,
-                selectedStyle === style && styles.dietStyleButtonSelected,
-              ]}
-              onPress={() => setSelectedStyle(style)}
-            >
-              <Text
-                style={[
-                  styles.dietStyleButtonText,
-                  selectedStyle === style && styles.dietStyleButtonTextSelected,
-                ]}
+        {/* Diet Style */}
+        <View style={styles.section}>
+          <Text variant="titleMedium" style={styles.sectionTitle}>
+            Diet Style
+          </Text>
+          <View style={styles.chipContainer}>
+            {DIET_STYLES.map((diet) => (
+              <Chip
+                key={diet.value}
+                selected={dietStyle === diet.value}
+                onPress={() => setDietStyle(diet.value)}
+                style={styles.chip}
+                disabled={isSaving}
+                mode={dietStyle === diet.value ? 'flat' : 'outlined'}
               >
-                {style}
-              </Text>
-            </TouchableOpacity>
-          ))}
+                {diet.label}
+              </Chip>
+            ))}
+          </View>
         </View>
 
-        <TouchableOpacity
-          style={styles.nextButton}
+        <Button
+          mode="contained"
           onPress={handleNext}
+          loading={isSaving}
+          disabled={isSaving}
+          style={styles.button}
         >
-          <Text style={styles.nextButtonText}>Next</Text>
-        </TouchableOpacity>
+          {isSaving ? 'Saving...' : 'Next'}
+        </Button>
       </View>
     </ScrollView>
   );
@@ -103,74 +156,41 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 30,
     textAlign: 'center',
+    marginBottom: 8,
+  },
+  subtitle: {
+    textAlign: 'center',
+    color: '#666',
+    marginBottom: 32,
+  },
+  section: {
+    marginBottom: 32,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 15,
-    color: '#333',
+    marginBottom: 16,
   },
-  preferencesContainer: {
+  switchContainer: {
+    backgroundColor: '#f5f5f5',
+    borderRadius: 12,
+    padding: 16,
+  },
+  switchRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  chipContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
-    marginBottom: 30,
+    gap: 8,
   },
-  preferenceButton: {
-    paddingVertical: 10,
-    paddingHorizontal: 15,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    minWidth: '45%',
-    alignItems: 'center',
+  chip: {
+    marginBottom: 8,
   },
-  preferenceButtonSelected: {
-    backgroundColor: '#2f95dc',
-    borderColor: '#2f95dc',
-  },
-  preferenceButtonText: {
-    fontSize: 16,
-    color: '#333',
-  },
-  preferenceButtonTextSelected: {
-    color: '#fff',
-  },
-  dietStylesContainer: {
-    gap: 10,
-    marginBottom: 30,
-  },
-  dietStyleButton: {
-    padding: 15,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    alignItems: 'center',
-  },
-  dietStyleButtonSelected: {
-    backgroundColor: '#2f95dc',
-    borderColor: '#2f95dc',
-  },
-  dietStyleButtonText: {
-    fontSize: 16,
-    color: '#333',
-  },
-  dietStyleButtonTextSelected: {
-    color: '#fff',
-  },
-  nextButton: {
-    backgroundColor: '#2f95dc',
-    padding: 15,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  nextButtonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
+  button: {
+    marginTop: 16,
+    padding: 4,
   },
 }); 

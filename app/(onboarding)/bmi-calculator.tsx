@@ -1,7 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Alert } from 'react-native';
 import { router } from 'expo-router';
 import { useOnboarding } from '@/context/onboarding';
+import { supabase } from '@/lib/supabase';
+import { Button } from '@/components/ui/button';
+import { useAuth } from '@/context/auth';
+import { UserModel } from '@/lib/models/user';
+import { Picker } from '@react-native-picker/picker';
 
 interface BMIRecommendation {
   category: string;
@@ -11,13 +16,28 @@ interface BMIRecommendation {
 
 export default function BMICalculatorScreen() {
   const { data } = useOnboarding();
+  const { session } = useAuth();
   const [weight, setWeight] = useState('');
   const [height, setHeight] = useState('');
+  const [age, setAge] = useState('');
+  const [gender, setGender] = useState('');
+  const [activityLevel, setActivityLevel] = useState('');
   const [bmi, setBmi] = useState<number | null>(null);
   const [recommendation, setRecommendation] = useState<BMIRecommendation | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const getBMICategory = (bmiValue: number): "Underweight" | "Normal Weight" | "Overweight" | "Obese" => {
+    if (bmiValue < 18.5) return "Underweight";
+    if (bmiValue >= 18.5 && bmiValue < 25) return "Normal Weight";
+    if (bmiValue >= 25 && bmiValue < 30) return "Overweight";
+    return "Obese";
+  };
 
   const calculateBMI = () => {
-    if (!weight || !height) return;
+    if (!weight || !height) {
+      Alert.alert('Error', 'Please enter both weight and height');
+      return;
+    }
     
     const weightNum = parseFloat(weight);
     const heightNum = parseFloat(height) / 100; // convert cm to meters
@@ -92,15 +112,56 @@ export default function BMICalculatorScreen() {
     }
   };
 
-  useEffect(() => {
-    if (data.primaryGoal) {
-      // Adjust recommendations based on user's goal
-      // This could be expanded based on your needs
+  const handleNext = async () => {
+    if (!weight || !height || !age || !gender || !activityLevel) {
+      Alert.alert('Error', 'Please fill in all fields');
+      return;
     }
-  }, [data.primaryGoal]);
 
-  const handleNext = () => {
-    router.push('/(onboarding)/goals');
+    const weightNum = parseFloat(weight);
+    const heightNum = parseFloat(height);
+    const ageNum = parseInt(age);
+
+    if (isNaN(weightNum) || isNaN(heightNum) || isNaN(ageNum)) {
+      Alert.alert('Error', 'Please enter valid numbers');
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      if (!session?.user?.id) {
+        throw new Error('User not authenticated');
+      }
+
+      const heightInMeters = heightNum / 100;
+      const bmiValue = weightNum / (heightInMeters * heightInMeters);
+      const bmiCategory = getBMICategory(bmiValue);
+
+      const { error } = await supabase
+        .from('user_health_metrics')
+        .upsert({
+          user_id: session.user.id,
+          weight: weightNum,
+          height: heightNum,
+          age: ageNum,
+          gender,
+          activity_level: activityLevel,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      console.log('BMI data saved successfully');
+      router.push('/(onboarding)/dietary-preferences');
+    } catch (error: any) {
+      console.error('Error saving health metrics:', error);
+      Alert.alert('Error', error.message || 'Failed to save health metrics');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -116,6 +177,7 @@ export default function BMICalculatorScreen() {
             onChangeText={setWeight}
             keyboardType="numeric"
             placeholder="Enter your weight"
+            editable={!isSaving}
           />
         </View>
 
@@ -127,12 +189,58 @@ export default function BMICalculatorScreen() {
             onChangeText={setHeight}
             keyboardType="numeric"
             placeholder="Enter your height"
+            editable={!isSaving}
           />
         </View>
 
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>Age</Text>
+          <TextInput
+            style={styles.input}
+            value={age}
+            onChangeText={setAge}
+            keyboardType="numeric"
+            placeholder="Enter your age"
+            editable={!isSaving}
+          />
+        </View>
+
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>Gender</Text>
+          <Picker
+            selectedValue={gender}
+            onValueChange={(value) => setGender(value)}
+            enabled={!isSaving}
+            style={styles.picker}
+          >
+            <Picker.Item label="Select gender" value="" />
+            <Picker.Item label="Male" value="male" />
+            <Picker.Item label="Female" value="female" />
+            <Picker.Item label="Other" value="other" />
+          </Picker>
+        </View>
+
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>Activity Level</Text>
+          <Picker
+            selectedValue={activityLevel}
+            onValueChange={(value) => setActivityLevel(value)}
+            enabled={!isSaving}
+            style={styles.picker}
+          >
+            <Picker.Item label="Select activity level" value="" />
+            <Picker.Item label="Sedentary" value="sedentary" />
+            <Picker.Item label="Lightly Active" value="lightly_active" />
+            <Picker.Item label="Moderately Active" value="moderately_active" />
+            <Picker.Item label="Very Active" value="very_active" />
+            <Picker.Item label="Extra Active" value="extra_active" />
+          </Picker>
+        </View>
+
         <TouchableOpacity
-          style={styles.calculateButton}
+          style={[styles.calculateButton, isSaving && styles.buttonDisabled]}
           onPress={calculateBMI}
+          disabled={isSaving}
         >
           <Text style={styles.buttonText}>Calculate BMI</Text>
         </TouchableOpacity>
@@ -154,12 +262,13 @@ export default function BMICalculatorScreen() {
           </View>
         )}
 
-        <TouchableOpacity
-          style={styles.nextButton}
+        <Button 
           onPress={handleNext}
+          disabled={isSaving || !weight || !height || !age || !gender || !activityLevel}
+          style={styles.button}
         >
-          <Text style={styles.buttonText}>Next</Text>
-        </TouchableOpacity>
+          {isSaving ? 'Saving...' : 'Next'}
+        </Button>
       </View>
     </ScrollView>
   );
@@ -233,15 +342,20 @@ const styles = StyleSheet.create({
     color: '#666',
     lineHeight: 22,
   },
-  nextButton: {
-    backgroundColor: '#2f95dc',
-    padding: 15,
-    borderRadius: 8,
-    alignItems: 'center',
+  button: {
+    width: '100%',
+  },
+  buttonDisabled: {
+    opacity: 0.7,
   },
   buttonText: {
     color: '#fff',
     fontSize: 18,
     fontWeight: 'bold',
+  },
+  picker: {
+    backgroundColor: '#f5f5f5',
+    borderRadius: 8,
+    marginBottom: 10,
   },
 }); 

@@ -52,10 +52,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           throw error;
         }
 
-        if (mounted) {
-          if (initialSession) {
-            setSession(initialSession);
+        if (mounted && initialSession) {
+          // Ensure user profile exists
+          const { data: profile, error: profileError } = await supabase
+            .from('user_profiles')
+            .select('id')
+            .eq('id', initialSession.user.id)
+            .single();
+
+          if (profileError && profileError.code !== 'PGRST116') {
+            console.error('Error checking profile:', profileError);
           }
+
+          // If no profile exists, create one
+          if (!profile) {
+            const { error: createError } = await supabase
+              .from('user_profiles')
+              .insert({
+                id: initialSession.user.id,
+                email: initialSession.user.email,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+              });
+
+            if (createError) {
+              console.error('Error creating profile:', createError);
+            }
+          }
+
+          setSession(initialSession);
+        }
+        if (mounted) {
           setIsLoading(false);
         }
       } catch (error) {
@@ -70,7 +97,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
       console.log('Auth event:', event);
-      if (mounted) {
+      if (mounted && currentSession) {
+        // Ensure user profile exists on auth state change
+        const { data: profile, error: profileError } = await supabase
+          .from('user_profiles')
+          .select('id')
+          .eq('id', currentSession.user.id)
+          .single();
+
+        if (profileError && profileError.code !== 'PGRST116') {
+          console.error('Error checking profile:', profileError);
+        }
+
+        // If no profile exists, create one
+        if (!profile) {
+          const { error: createError } = await supabase
+            .from('user_profiles')
+            .insert({
+              id: currentSession.user.id,
+              email: currentSession.user.email,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            });
+
+          if (createError) {
+            console.error('Error creating profile:', createError);
+          }
+        }
+
         setSession(currentSession);
       }
     });
@@ -94,6 +148,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (error) throw error;
 
       if (data?.user) {
+        // Create user profile in Supabase
+        const { error: profileError } = await supabase
+          .from('user_profiles')
+          .insert({
+            id: data.user.id,
+            email: data.user.email,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          });
+
+        if (profileError) {
+          console.error('Error creating user profile:', profileError);
+          // Don't throw the error as the user is already created
+        }
+
         Alert.alert(
           'Check your email',
           'We have sent you an email to verify your account. Please check your inbox and follow the verification link.',
@@ -108,6 +177,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error('Signup failed: No user data received');
       }
     } catch (error: any) {
+      console.error('Signup error:', error);
       Alert.alert('Error', error.message || 'An unexpected error occurred');
       throw error;
     }
@@ -124,6 +194,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       if (data?.session) {
         console.log('Sign in successful, setting session');
+
+        // Ensure user profile exists
+        const { data: profile, error: profileError } = await supabase
+          .from('user_profiles')
+          .select('id')
+          .eq('id', data.session.user.id)
+          .single();
+
+        if (profileError && profileError.code !== 'PGRST116') {
+          console.error('Error checking profile:', profileError);
+        }
+
+        // If no profile exists, create one
+        if (!profile) {
+          const { error: createError } = await supabase
+            .from('user_profiles')
+            .insert({
+              id: data.session.user.id,
+              email: data.session.user.email,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            });
+
+          if (createError) {
+            console.error('Error creating profile:', createError);
+          }
+        }
+
         setSession(data.session);
         router.replace('/(onboarding)/bmi-calculator');
       }
