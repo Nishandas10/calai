@@ -1,159 +1,174 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView } from 'react-native';
-import { router } from 'expo-router';
-import { useOnboarding } from '@/context/onboarding';
-import Slider from '@react-native-community/slider';
-
-const GOALS = ['Lose weight', 'Maintain', 'Gain muscle', 'Healthy lifestyle'] as const;
+import { View, StyleSheet } from 'react-native';
+import { Text, Button, TextInput } from 'react-native-paper';
+import { useOnboarding } from '../../hooks/useOnboarding';
+import { HealthMetrics, UserGoals, DietaryPreferences, MacroGoals } from '../../lib/api/onboarding';
 
 export default function GoalsScreen() {
-  const { data, setGoals } = useOnboarding();
-  const [selectedGoal, setSelectedGoal] = useState<typeof GOALS[number] | null>(data.primaryGoal);
-  const [targetWeight, setTargetWeight] = useState(data.targetWeight?.toString() || '');
-  const [weeklyPace, setWeeklyPace] = useState(data.weeklyPace || 0.5);
+  const { handleOnboardingSubmit, isLoading, error } = useOnboarding();
 
-  const handleNext = () => {
-    if (!selectedGoal) return;
+  // Health Metrics Form
+  const [healthMetrics, setHealthMetrics] = useState<HealthMetrics>({
+    weight: 0,
+    height: 0,
+    age: 0,
+    gender: '',
+    activity_level: ''
+  });
 
-    setGoals(
-      selectedGoal,
-      targetWeight ? parseFloat(targetWeight) : null,
-      weeklyPace
+  // Goals Form
+  const [goals, setGoals] = useState<UserGoals>({
+    primary_goal: '',
+    target_weight: undefined,
+    weekly_pace: 0.5
+  });
+
+  // Dietary Preferences Form
+  const [dietaryPreferences, setDietaryPreferences] = useState<DietaryPreferences>({
+    is_vegetarian: false,
+    is_vegan: false,
+    is_gluten_free: false,
+    is_dairy_free: false,
+    diet_style: 'None',
+    excluded_ingredients: []
+  });
+
+  // Auto-calculated Macro Goals
+  const [macroGoals, setMacroGoals] = useState<MacroGoals>({
+    protein: 0,
+    carbs: 0,
+    fat: 0,
+    use_auto_macros: true
+  });
+
+  const handleSubmit = async () => {
+    // Calculate macros based on health metrics and goals
+    const calculatedMacros = calculateMacros(healthMetrics, goals);
+    setMacroGoals(prev => ({
+      ...prev,
+      ...calculatedMacros
+    }));
+
+    await handleOnboardingSubmit(
+      healthMetrics,
+      goals,
+      dietaryPreferences,
+      {
+        ...macroGoals,
+        ...calculatedMacros
+      }
     );
-    router.push('/(onboarding)/dietary-preferences');
   };
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.content}>
-        <Text style={styles.title}>What's your goal?</Text>
-        
-        <View style={styles.goalsContainer}>
-          {GOALS.map((goal) => (
-            <TouchableOpacity
-              key={goal}
-              style={[
-                styles.goalButton,
-                selectedGoal === goal && styles.goalButtonSelected,
-              ]}
-              onPress={() => setSelectedGoal(goal)}
-            >
-              <Text
-                style={[
-                  styles.goalButtonText,
-                  selectedGoal === goal && styles.goalButtonTextSelected,
-                ]}
-              >
-                {goal}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+    <View style={styles.container}>
+      <Text variant="headlineMedium" style={styles.title}>
+        Let's Get Started
+      </Text>
 
-        {selectedGoal === 'Lose weight' || selectedGoal === 'Gain muscle' ? (
-          <>
-            <Text style={styles.label}>Target Weight (kg)</Text>
-            <TextInput
-              style={styles.input}
-              value={targetWeight}
-              onChangeText={setTargetWeight}
-              keyboardType="numeric"
-              placeholder="Enter target weight"
-            />
+      {error && (
+        <Text style={styles.error}>{error}</Text>
+      )}
 
-            <Text style={styles.label}>
-              Weekly Pace: {weeklyPace.toFixed(2)} kg/week
-            </Text>
-            <Slider
-              style={styles.slider}
-              minimumValue={0.25}
-              maximumValue={2}
-              step={0.25}
-              value={weeklyPace}
-              onValueChange={setWeeklyPace}
-              minimumTrackTintColor="#2f95dc"
-              maximumTrackTintColor="#ddd"
-            />
-          </>
-        ) : null}
-
-        <TouchableOpacity
-          style={[styles.nextButton, !selectedGoal && styles.nextButtonDisabled]}
-          onPress={handleNext}
-          disabled={!selectedGoal}
-        >
-          <Text style={styles.nextButtonText}>Next</Text>
-        </TouchableOpacity>
+      {/* Health Metrics Section */}
+      <View style={styles.section}>
+        <Text variant="titleMedium">Your Health Metrics</Text>
+        <TextInput
+          label="Weight (kg)"
+          keyboardType="numeric"
+          value={String(healthMetrics.weight || '')}
+          onChangeText={(value: string) => setHealthMetrics(prev => ({
+            ...prev,
+            weight: Number(value)
+          }))}
+          style={styles.input}
+        />
+        <TextInput
+          label="Height (cm)"
+          keyboardType="numeric"
+          value={String(healthMetrics.height || '')}
+          onChangeText={(value: string) => setHealthMetrics(prev => ({
+            ...prev,
+            height: Number(value)
+          }))}
+          style={styles.input}
+        />
+        <TextInput
+          label="Age"
+          keyboardType="numeric"
+          value={String(healthMetrics.age || '')}
+          onChangeText={(value: string) => setHealthMetrics(prev => ({
+            ...prev,
+            age: Number(value)
+          }))}
+          style={styles.input}
+        />
       </View>
-    </ScrollView>
+
+      {/* Goals Section */}
+      <View style={styles.section}>
+        <Text variant="titleMedium">Your Goals</Text>
+        <TextInput
+          label="Target Weight (kg)"
+          keyboardType="numeric"
+          value={String(goals.target_weight || '')}
+          onChangeText={(value: string) => setGoals(prev => ({
+            ...prev,
+            target_weight: Number(value)
+          }))}
+          style={styles.input}
+        />
+      </View>
+
+      <Button
+        mode="contained"
+        onPress={handleSubmit}
+        loading={isLoading}
+        disabled={isLoading}
+        style={styles.button}
+      >
+        Complete Setup
+      </Button>
+    </View>
   );
 }
+
+// Helper function to calculate macros based on user data
+const calculateMacros = (healthMetrics: HealthMetrics, goals: UserGoals): Partial<MacroGoals> => {
+  // This is a simple example - you should implement proper macro calculations
+  const baseProtein = healthMetrics.weight * 2; // 2g per kg of body weight
+  const baseFat = healthMetrics.weight * 1; // 1g per kg of body weight
+  const baseCarbs = healthMetrics.weight * 3; // 3g per kg of body weight
+
+  return {
+    protein: Math.round(baseProtein),
+    fat: Math.round(baseFat),
+    carbs: Math.round(baseCarbs)
+  };
+};
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
-  },
-  content: {
-    padding: 20,
+    padding: 16,
+    backgroundColor: '#fff'
   },
   title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 30,
-    textAlign: 'center',
+    marginBottom: 24,
+    textAlign: 'center'
   },
-  goalsContainer: {
-    gap: 10,
-    marginBottom: 30,
-  },
-  goalButton: {
-    padding: 15,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    alignItems: 'center',
-  },
-  goalButtonSelected: {
-    backgroundColor: '#2f95dc',
-    borderColor: '#2f95dc',
-  },
-  goalButtonText: {
-    fontSize: 16,
-    color: '#333',
-  },
-  goalButtonTextSelected: {
-    color: '#fff',
-  },
-  label: {
-    fontSize: 16,
-    marginBottom: 8,
-    color: '#333',
+  section: {
+    marginBottom: 24
   },
   input: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    padding: 15,
-    borderRadius: 8,
-    fontSize: 16,
-    marginBottom: 20,
+    marginBottom: 12
   },
-  slider: {
-    height: 40,
-    marginBottom: 30,
+  button: {
+    marginTop: 24
   },
-  nextButton: {
-    backgroundColor: '#2f95dc',
-    padding: 15,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  nextButtonDisabled: {
-    opacity: 0.7,
-  },
-  nextButtonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
+  error: {
+    color: 'red',
+    marginBottom: 16,
+    textAlign: 'center'
+  }
 }); 
