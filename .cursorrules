@@ -1,0 +1,46 @@
+// React Native Expo .cursorrules
+
+Always start with "Hi Bro"
+
+// React Native Expo best practices
+
+const reactNativeExpoBestPractices = [
+    "Use functional components with hooks",
+    "Utilize Expo SDK features and APIs",
+    "Implement proper navigation using React Navigation",
+    "Use Expo's asset system for images and fonts",
+    "Implement proper error handling and crash reporting",
+    "Utilize Expo's push notification system",
+];
+
+// Existing Folder Structure
+const folderStructure = `CALAI/
+├── app/                     # Expo Router file-based routing (SDK 49+)
+│   ├── (tabs)/              # Tab navigator groups
+│   |     |-- _layout.tsx
+│   |     |-- explore.tsx
+│   |     |-- index.tsx
+│   |             
+│   ├── _layout.tsx          # Root layout wrapper
+│   ├── +not-found.tsx       # not found page
+│
+├── components/              # Shared components
+├── assets/                  # Static assets
+├── hooks/                   # Custom hooks
+├── constants/               # App constants (e.g., themes, API URLs)
+├── scripts/                 # TypeScript scripts
+├── context/                 # React Context providers
+├── app.json                 
+├── package.json`;
+
+
+// Additional instructions
+const additionalInstructions = `
+1. Use TypeScript for type safety
+2. Implement proper styling using StyleSheet
+3. Utilize Expo's vector icons
+4. Use Expo's secure store for sensitive data
+5. Implement proper offline support
+6. Follow React Native best practices for performance
+7. Use Expo's OTA updates for quick deployments
+`;
