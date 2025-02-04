@@ -31,7 +31,7 @@ export const useOnboarding = () => {
       );
 
       // Navigate to the main app after successful onboarding
-      router.replace("/");
+      // router.replace("+not-found");
     } catch (err) {
       setError(
         err instanceof Error

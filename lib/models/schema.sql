@@ -1,17 +1,14 @@
 -- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- Create user_profiles table
+-- Create Tables
 CREATE TABLE IF NOT EXISTS public.user_profiles (
     id UUID PRIMARY KEY REFERENCES auth.users(id),
     email TEXT NOT NULL,
-    full_name TEXT,
-    avatar_url TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
 );
 
--- Create user_health_metrics table
 CREATE TABLE IF NOT EXISTS public.user_health_metrics (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID REFERENCES user_profiles(id) ON DELETE CASCADE,
@@ -25,18 +22,16 @@ CREATE TABLE IF NOT EXISTS public.user_health_metrics (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- Create user_goals table
 CREATE TABLE IF NOT EXISTS public.user_goals (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID REFERENCES user_profiles(id) ON DELETE CASCADE,
-    primary_goal TEXT NOT NULL, -- e.g., 'weight_loss', 'muscle_gain', 'maintenance'
+    primary_goal TEXT NOT NULL,
     target_weight NUMERIC,
-    weekly_pace NUMERIC NOT NULL, -- e.g., 0.5 kg/week
+    weekly_pace NUMERIC NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- Create user_dietary_preferences table
 CREATE TABLE IF NOT EXISTS public.user_dietary_preferences (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID REFERENCES user_profiles(id) ON DELETE CASCADE,
@@ -44,13 +39,12 @@ CREATE TABLE IF NOT EXISTS public.user_dietary_preferences (
     is_vegan BOOLEAN DEFAULT FALSE,
     is_gluten_free BOOLEAN DEFAULT FALSE,
     is_dairy_free BOOLEAN DEFAULT FALSE,
-    diet_style TEXT DEFAULT 'None', -- e.g., 'keto', 'paleo', 'mediterranean'
+    diet_style TEXT DEFAULT 'None',
     excluded_ingredients TEXT[],
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- Create user_macro_goals table
 CREATE TABLE IF NOT EXISTS public.user_macro_goals (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID REFERENCES user_profiles(id) ON DELETE CASCADE,
@@ -75,55 +69,79 @@ ALTER TABLE public.user_goals ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.user_dietary_preferences ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.user_macro_goals ENABLE ROW LEVEL SECURITY;
 
--- Drop ALL existing policies for dietary preferences
-DROP POLICY IF EXISTS "Enable insert for authenticated users" ON public.user_dietary_preferences;
-DROP POLICY IF EXISTS "Enable insert for users based on user_id" ON public.user_dietary_preferences;
-DROP POLICY IF EXISTS "Enable select for own rows" ON public.user_dietary_preferences;
-DROP POLICY IF EXISTS "Enable select for users based on user_id" ON public.user_dietary_preferences;
-DROP POLICY IF EXISTS "Enable update for own rows" ON public.user_dietary_preferences;
-DROP POLICY IF EXISTS "Enable update for users based on user_id" ON public.user_dietary_preferences;
-DROP POLICY IF EXISTS "Enable delete for own rows" ON public.user_dietary_preferences;
-DROP POLICY IF EXISTS "Enable delete for users based on user_id" ON public.user_dietary_preferences;
+-- Drop existing policies first
+DROP POLICY IF EXISTS "Enable service role access" ON public.user_profiles;
+DROP POLICY IF EXISTS "Enable users to read own profile" ON public.user_profiles;
+DROP POLICY IF EXISTS "Enable users to update own profile" ON public.user_profiles;
 
--- Drop ALL existing policies for macro goals
-DROP POLICY IF EXISTS "Enable insert for authenticated users" ON public.user_macro_goals;
-DROP POLICY IF EXISTS "Enable insert for authenticated users only" ON public.user_macro_goals;
-DROP POLICY IF EXISTS "Enable select for own rows" ON public.user_macro_goals;
-DROP POLICY IF EXISTS "Enable select for authenticated users" ON public.user_macro_goals;
-DROP POLICY IF EXISTS "Enable update for own rows" ON public.user_macro_goals;
-DROP POLICY IF EXISTS "Enable update for users based on user_id" ON public.user_macro_goals;
-DROP POLICY IF EXISTS "Enable delete for own rows" ON public.user_macro_goals;
-
--- Create new policies for dietary preferences
+-- Create policies for user_profiles with proper insert permissions
 CREATE POLICY "Enable insert for authenticated users"
-ON public.user_dietary_preferences FOR INSERT
-WITH CHECK (auth.role() = 'authenticated');
+ON public.user_profiles FOR INSERT
+TO authenticated
+WITH CHECK (auth.uid() = id);
 
-CREATE POLICY "Enable select for own rows"
-ON public.user_dietary_preferences FOR SELECT
-USING (auth.uid() = user_id);
+CREATE POLICY "Enable read access for own profile"
+ON public.user_profiles FOR SELECT
+TO authenticated
+USING (auth.uid() = id);
 
-CREATE POLICY "Enable update for own rows"
-ON public.user_dietary_preferences FOR UPDATE
-USING (auth.uid() = user_id);
+CREATE POLICY "Enable update access for own profile"
+ON public.user_profiles FOR UPDATE
+TO authenticated
+USING (auth.uid() = id)
+WITH CHECK (auth.uid() = id);
 
-CREATE POLICY "Enable delete for own rows"
-ON public.user_dietary_preferences FOR DELETE
-USING (auth.uid() = user_id);
+CREATE POLICY "Enable service role full access"
+ON public.user_profiles
+TO service_role
+USING (true)
+WITH CHECK (true);
 
--- Create new policies for macro goals
-CREATE POLICY "Enable insert for authenticated users"
-ON public.user_macro_goals FOR INSERT
-WITH CHECK (auth.role() = 'authenticated');
+-- Update permissions to include INSERT
+GRANT SELECT, INSERT, UPDATE ON public.user_profiles TO authenticated;
 
-CREATE POLICY "Enable select for own rows"
-ON public.user_macro_goals FOR SELECT
-USING (auth.uid() = user_id);
+-- Create policies for other tables
+CREATE POLICY "Enable authenticated CRUD for own data"
+ON public.user_health_metrics
+FOR ALL
+TO authenticated
+USING (auth.uid() = user_id)
+WITH CHECK (auth.uid() = user_id);
 
-CREATE POLICY "Enable update for own rows"
-ON public.user_macro_goals FOR UPDATE
-USING (auth.uid() = user_id);
+CREATE POLICY "Enable authenticated CRUD for own data"
+ON public.user_goals
+FOR ALL
+TO authenticated
+USING (auth.uid() = user_id)
+WITH CHECK (auth.uid() = user_id);
 
-CREATE POLICY "Enable delete for own rows"
-ON public.user_macro_goals FOR DELETE
-USING (auth.uid() = user_id); 
+CREATE POLICY "Enable authenticated CRUD for own data"
+ON public.user_dietary_preferences
+FOR ALL
+TO authenticated
+USING (auth.uid() = user_id)
+WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Enable authenticated CRUD for own data"
+ON public.user_macro_goals
+FOR ALL
+TO authenticated
+USING (auth.uid() = user_id)
+WITH CHECK (auth.uid() = user_id);
+
+-- Set permissions
+ALTER TABLE public.user_profiles OWNER TO postgres;
+GRANT ALL ON ALL TABLES IN SCHEMA public TO postgres;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO postgres;
+
+-- Grant access to service role
+GRANT ALL ON ALL TABLES IN SCHEMA public TO service_role;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO service_role;
+
+-- Grant access to authenticated users
+GRANT SELECT, UPDATE ON public.user_profiles TO authenticated;
+GRANT ALL ON public.user_health_metrics TO authenticated;
+GRANT ALL ON public.user_goals TO authenticated;
+GRANT ALL ON public.user_dietary_preferences TO authenticated;
+GRANT ALL ON public.user_macro_goals TO authenticated;
+GRANT USAGE ON ALL SEQUENCES IN SCHEMA public TO authenticated;
