@@ -68,14 +68,6 @@ export default function SignIn() {
         >
           <Text style={styles.buttonText}>{loading ? 'Signing in...' : 'Sign In'}</Text>
         </TouchableOpacity>
-        
-        {/* Test connection button */}
-        <TouchableOpacity
-          style={[styles.button, styles.testButton]}
-          onPress={testConnection}
-        >
-          <Text style={styles.buttonText}>Test Connection</Text>
-        </TouchableOpacity>
       </View>
       <View style={styles.footer}>
         <Text>Don't have an account? </Text>

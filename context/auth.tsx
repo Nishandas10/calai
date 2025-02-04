@@ -148,21 +148,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (error) throw error;
 
       if (data?.user) {
-        // Create user profile in Supabase
-        const { error: profileError } = await supabase
-          .from('user_profiles')
-          .insert({
-            id: data.user.id,
-            email: data.user.email,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          });
-
-        if (profileError) {
-          console.error('Error creating user profile:', profileError);
-          // Don't throw the error as the user is already created
-        }
-
         Alert.alert(
           'Check your email',
           'We have sent you an email to verify your account. Please check your inbox and follow the verification link.',
