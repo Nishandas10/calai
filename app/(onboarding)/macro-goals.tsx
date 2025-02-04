@@ -48,7 +48,7 @@ export default function MacroGoalsScreen() {
         updated_at: new Date().toISOString()
       });
 
-      router.push('/+not-found');
+      router.push('/user-goals');
     } catch (error: any) {
       console.error('Error saving macro goals:', error);
       Alert.alert('Error', error.message || 'Failed to save macro goals');
@@ -125,7 +125,7 @@ export default function MacroGoalsScreen() {
           disabled={isSaving || (!useAutoCalculation && (!protein || !carbs || !fat))}
           style={styles.button}
         >
-          {isSaving ? 'Saving...' : 'Finish'}
+          {isSaving ? 'Saving...' : 'Next'}
         </Button>
       </View>
     </ScrollView>
