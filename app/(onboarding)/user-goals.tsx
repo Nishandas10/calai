@@ -54,10 +54,13 @@ export default function UserGoalsScreen() {
       if (profileError) throw profileError;
 
       // Navigate to main app
-      router.replace('/+not-found');
+      router.replace('/(tabs)');
     } catch (error: any) {
       console.error('Error saving goals:', error);
       Alert.alert('Error', error.message);
+
+
+
     } finally {
       setIsLoading(false);
     }
