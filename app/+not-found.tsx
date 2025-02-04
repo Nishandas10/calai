@@ -4,6 +4,8 @@ import { StyleSheet } from 'react-native';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 
+import React from 'react'; // Import React to fix the lint error
+
 export default function NotFoundScreen() {
   return (
     <>
