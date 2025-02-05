@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity, Alert } from 'react-native';
 import { useAuth } from '@/context/auth';
 import { supabase } from '@/lib/supabase';
 import { Ionicons } from '@expo/vector-icons';
 import { CircularProgress } from '@/components/ui/circular-progress';
 import { Card } from '@/components/ui/card';
+import { Camera } from 'expo-camera';
+import { CameraView } from '@/components/camera/CameraView';
 
 interface DailyNutrition {
   target_calories: number;
@@ -21,6 +23,7 @@ export default function DashboardScreen() {
   const { session } = useAuth();
   const [loading, setLoading] = useState(true);
   const [nutrition, setNutrition] = useState<DailyNutrition | null>(null);
+  const [showCamera, setShowCamera] = useState(false);
 
   useEffect(() => {
     fetchOrCreateDailyTargets();
@@ -150,81 +153,96 @@ export default function DashboardScreen() {
   }
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Cal AI</Text>
-        <View style={styles.streakContainer}>
-          <Ionicons name="flame" size={24} color="#FF9500" />
-          <Text style={styles.streakText}>0</Text>
+    <View style={styles.container}>
+      <ScrollView style={styles.scrollView}>
+        <View style={styles.header}>
+          <Text style={styles.title}>Cal AI</Text>
+          <View style={styles.streakContainer}>
+            <Ionicons name="flame" size={24} color="#FF9500" />
+            <Text style={styles.streakText}>0</Text>
+          </View>
         </View>
-      </View>
 
-      <Card style={styles.calorieCard}>
-        <Text style={styles.calorieTitle}>
-          {nutrition.target_calories - nutrition.consumed_calories}
-        </Text>
-        <Text style={styles.calorieSubtitle}>Calories left</Text>
-        <CircularProgress 
-          value={(nutrition.consumed_calories / nutrition.target_calories) * 100}
-          size={120}
-          strokeWidth={10}
-          color="#FF9500"
-        />
-      </Card>
-
-      <View style={styles.macrosContainer}>
-        <Card style={styles.macroCard}>
-          <Text style={styles.macroValue}>
-            {nutrition.target_protein - nutrition.consumed_protein}g
+        <Card style={styles.calorieCard}>
+          <Text style={styles.calorieTitle}>
+            {nutrition.target_calories - nutrition.consumed_calories}
           </Text>
-          <Text style={styles.macroLabel}>Protein left</Text>
+          <Text style={styles.calorieSubtitle}>Calories left</Text>
           <CircularProgress 
-            value={(nutrition.consumed_protein / nutrition.target_protein) * 100}
-            size={80}
-            strokeWidth={8}
-            color="#FF2D55"
+            value={(nutrition.consumed_calories / nutrition.target_calories) * 100}
+            size={120}
+            strokeWidth={10}
+            color="#FF9500"
           />
         </Card>
 
-        <Card style={styles.macroCard}>
-          <Text style={styles.macroValue}>
-            {nutrition.target_carbs - nutrition.consumed_carbs}g
-          </Text>
-          <Text style={styles.macroLabel}>Carbs left</Text>
-          <CircularProgress 
-            value={(nutrition.consumed_carbs / nutrition.target_carbs) * 100}
-            size={80}
-            strokeWidth={8}
-            color="#5856D6"
-          />
-        </Card>
+        <View style={styles.macrosContainer}>
+          <Card style={styles.macroCard}>
+            <Text style={styles.macroValue}>
+              {nutrition.target_protein - nutrition.consumed_protein}g
+            </Text>
+            <Text style={styles.macroLabel}>Protein left</Text>
+            <CircularProgress 
+              value={(nutrition.consumed_protein / nutrition.target_protein) * 100}
+              size={80}
+              strokeWidth={8}
+              color="#FF2D55"
+            />
+          </Card>
 
-        <Card style={styles.macroCard}>
-          <Text style={styles.macroValue}>
-            {nutrition.target_fat - nutrition.consumed_fat}g
-          </Text>
-          <Text style={styles.macroLabel}>Fats left</Text>
-          <CircularProgress 
-            value={(nutrition.consumed_fat / nutrition.target_fat) * 100}
-            size={80}
-            strokeWidth={8}
-            color="#34C759"
-          />
-        </Card>
-      </View>
+          <Card style={styles.macroCard}>
+            <Text style={styles.macroValue}>
+              {nutrition.target_carbs - nutrition.consumed_carbs}g
+            </Text>
+            <Text style={styles.macroLabel}>Carbs left</Text>
+            <CircularProgress 
+              value={(nutrition.consumed_carbs / nutrition.target_carbs) * 100}
+              size={80}
+              strokeWidth={8}
+              color="#5856D6"
+            />
+          </Card>
 
-      <View style={styles.recentSection}>
-        <Text style={styles.sectionTitle}>Recently eaten</Text>
-        <View style={styles.emptyState}>
-          <Text style={styles.emptyStateText}>
-            You haven't uploaded any food
-          </Text>
-          <Text style={styles.emptyStateSubtext}>
-            Start tracking Today's meals by taking a quick pictures
-          </Text>
+          <Card style={styles.macroCard}>
+            <Text style={styles.macroValue}>
+              {nutrition.target_fat - nutrition.consumed_fat}g
+            </Text>
+            <Text style={styles.macroLabel}>Fats left</Text>
+            <CircularProgress 
+              value={(nutrition.consumed_fat / nutrition.target_fat) * 100}
+              size={80}
+              strokeWidth={8}
+              color="#34C759"
+            />
+          </Card>
         </View>
-      </View>
-    </ScrollView>
+
+        <View style={styles.recentSection}>
+          <Text style={styles.sectionTitle}>Recently eaten</Text>
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyStateText}>
+              You haven't uploaded any food
+            </Text>
+            <Text style={styles.emptyStateSubtext}>
+              Start tracking Today's meals by taking a quick pictures
+            </Text>
+          </View>
+        </View>
+      </ScrollView>
+
+      {/* Camera FAB */}
+      <TouchableOpacity 
+        style={styles.fab}
+        onPress={() => setShowCamera(true)}
+      >
+        <Ionicons name="add" size={24} color="white" />
+      </TouchableOpacity>
+
+      <CameraView 
+        isVisible={showCamera}
+        onClose={() => setShowCamera(false)}
+      />
+    </View>
   );
 }
 
@@ -232,6 +250,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
+  },
+  scrollView: {
+    flex: 1,
   },
   loadingContainer: {
     flex: 1,
@@ -324,5 +345,24 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     textAlign: 'center',
+  },
+  fab: {
+    position: 'absolute',
+    bottom: 20,
+    right: 20,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#2f95dc',
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.30,
+    shadowRadius: 4.65,
   },
 }); 
