@@ -23,15 +23,52 @@ function useProtectedRoute(session: Session | null) {
     if (!navigationState?.key) return;
 
     const inAuthGroup = segments[0] === '(auth)';
+    const inOnboardingGroup = segments[0] === '(onboarding)';
+    const inTabsGroup = segments[0] === '(tabs)';
+    
     console.log('Current route:', { segments, inAuthGroup, hasSession: !!session });
 
-    if (!session && !inAuthGroup) {
-      console.log('No session, redirecting to sign-in');
-      router.replace('/(auth)/sign-in');
-    } else if (session && inAuthGroup) {
-      console.log('Has session but in auth group, redirecting to bmi-calculator');
-      router.replace('/(onboarding)/bmi-calculator');
+    async function checkAuthAndOnboarding() {
+      try {
+        // If no session, redirect to sign in unless already in auth group
+        if (!session) {
+          if (!inAuthGroup) {
+            console.log('No session, redirecting to sign-in');
+            router.replace('/(auth)/sign-in');
+          }
+          return;
+        }
+
+        // If we have a session, check onboarding status
+        const { data: profile, error } = await supabase
+          .from('user_profiles')
+          .select('onboarding_completed')
+          .eq('id', session.user.id)
+          .single();
+
+        if (error) {
+          console.error('Error checking profile:', error);
+          return;
+        }
+
+        // Handle navigation based on onboarding status
+        if (profile?.onboarding_completed) {
+          if (inAuthGroup || inOnboardingGroup) {
+            console.log('Onboarding completed, redirecting to main app');
+            router.replace('/(tabs)');
+          }
+        } else {
+          if (inTabsGroup || inAuthGroup) {
+            console.log('Onboarding not completed, redirecting to onboarding');
+            router.replace('/(onboarding)/bmi-calculator');
+          }
+        }
+      } catch (error) {
+        console.error('Error in checkAuthAndOnboarding:', error);
+      }
     }
+
+    checkAuthAndOnboarding();
   }, [session, segments, navigationState?.key]);
 }
 
@@ -46,48 +83,53 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     async function getInitialSession() {
       try {
+        setIsLoading(true);
         const { data: { session: initialSession }, error } = await supabase.auth.getSession();
         
         if (error) {
           throw error;
         }
 
-        if (mounted && initialSession) {
-          // Ensure user profile exists
-          const { data: profile, error: profileError } = await supabase
-            .from('user_profiles')
-            .select('id')
-            .eq('id', initialSession.user.id)
-            .single();
-
-          if (profileError && profileError.code !== 'PGRST116') {
-            console.error('Error checking profile:', profileError);
-          }
-
-          // If no profile exists, create one
-          if (!profile) {
-            const { error: createError } = await supabase
-              .from('user_profiles')
-              .insert({
-                id: initialSession.user.id,
-                email: initialSession.user.email,
-                created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString()
-              });
-
-            if (createError) {
-              console.error('Error creating profile:', createError);
-            }
-          }
-
-          setSession(initialSession);
-        }
         if (mounted) {
+          if (initialSession) {
+            // Ensure user profile exists
+            const { data: profile, error: profileError } = await supabase
+              .from('user_profiles')
+              .select('id, onboarding_completed')
+              .eq('id', initialSession.user.id)
+              .single();
+
+            if (profileError && profileError.code !== 'PGRST116') {
+              console.error('Error checking profile:', profileError);
+            }
+
+            // If no profile exists, create one
+            if (!profile) {
+              const { error: createError } = await supabase
+                .from('user_profiles')
+                .insert({
+                  id: initialSession.user.id,
+                  email: initialSession.user.email,
+                  created_at: new Date().toISOString(),
+                  updated_at: new Date().toISOString(),
+                  onboarding_completed: false
+                });
+
+              if (createError) {
+                console.error('Error creating profile:', createError);
+              }
+            }
+
+            setSession(initialSession);
+          } else {
+            setSession(null);
+          }
           setIsLoading(false);
         }
       } catch (error) {
         console.error('Error getting initial session:', error);
         if (mounted) {
+          setSession(null);
           setIsLoading(false);
         }
       }
@@ -180,10 +222,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (data?.session) {
         console.log('Sign in successful, setting session');
 
-        // Ensure user profile exists
+        // Check user profile and onboarding status
         const { data: profile, error: profileError } = await supabase
           .from('user_profiles')
-          .select('id')
+          .select('id, onboarding_completed')
           .eq('id', data.session.user.id)
           .single();
 
@@ -199,16 +241,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               id: data.session.user.id,
               email: data.session.user.email,
               created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString()
+              updated_at: new Date().toISOString(),
+              onboarding_completed: false
             });
 
           if (createError) {
             console.error('Error creating profile:', createError);
           }
+          setSession(data.session);
+          router.replace('/(onboarding)/bmi-calculator');
+        } else {
+          setSession(data.session);
+          if (profile.onboarding_completed) {
+            router.replace('/(tabs)');
+          } else {
+            router.replace('/(onboarding)/bmi-calculator');
+          }
         }
-
-        setSession(data.session);
-        router.replace('/(onboarding)/bmi-calculator');
       }
     } catch (error: any) {
       console.error('Sign in error:', error);
