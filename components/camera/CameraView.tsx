@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
-import { View, TouchableOpacity, StyleSheet, Modal, Alert } from 'react-native';
-import { CameraView as ExpoCameraView, useCameraPermissions, CameraType } from 'expo-camera';
+import { View, TouchableOpacity, StyleSheet, Modal, Alert, Image } from 'react-native';
+import { CameraView as ExpoCameraView, useCameraPermissions } from 'expo-camera';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/context/auth';
 import { uploadFoodImage } from '@/lib/services/storage';
@@ -16,6 +16,7 @@ export function CameraView({ isVisible, onClose }: CameraViewProps) {
   const [permission, requestPermission] = useCameraPermissions();
   const [facing, setFacing] = useState<'back' | 'front'>('back');
   const [isCapturing, setIsCapturing] = useState(false);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
   const cameraRef = useRef<ExpoCameraView>(null);
 
   if (!isVisible) {
@@ -33,7 +34,7 @@ export function CameraView({ isVisible, onClose }: CameraViewProps) {
   };
 
   const handleCapture = async () => {
-    if (!cameraRef.current || !session?.user?.id || isCapturing) return;
+    if (!cameraRef.current || isCapturing) return;
 
     try {
       setIsCapturing(true);
@@ -55,19 +56,38 @@ export function CameraView({ isVisible, onClose }: CameraViewProps) {
         { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG }
       );
 
+      setPreviewImage(manipulatedImage.uri);
+    } catch (error) {
+      console.error('Error capturing photo:', error);
+      Alert.alert('Error', 'Failed to capture photo. Please try again.');
+    } finally {
+      setIsCapturing(false);
+    }
+  };
+
+  const handleAccept = async () => {
+    if (!previewImage || !session?.user?.id) return;
+
+    try {
+      setIsCapturing(true);
+      
       // Upload to Supabase storage
-      const imageUrl = await uploadFoodImage(manipulatedImage.uri, session.user.id);
+      const imageUrl = await uploadFoodImage(previewImage, session.user.id);
       console.log('Image uploaded successfully:', imageUrl);
 
       // Close camera after successful upload
       onClose();
-      Alert.alert('Success', 'Photo captured and uploaded successfully!');
+      Alert.alert('Success', 'Photo uploaded successfully!');
     } catch (error) {
-      console.error('Error capturing photo:', error);
-      Alert.alert('Error', 'Failed to capture and upload photo. Please try again.');
+      console.error('Error uploading photo:', error);
+      Alert.alert('Error', 'Failed to upload photo. Please try again.');
     } finally {
       setIsCapturing(false);
     }
+  };
+
+  const handleRetake = () => {
+    setPreviewImage(null);
   };
 
   return (
@@ -78,35 +98,59 @@ export function CameraView({ isVisible, onClose }: CameraViewProps) {
       onRequestClose={onClose}
     >
       <View style={styles.container}>
-        <ExpoCameraView 
-          ref={cameraRef}
-          style={styles.camera} 
-          facing={facing}
-        >
-          <View style={styles.buttonContainer}>
-            <TouchableOpacity
-              style={styles.flipButton}
-              onPress={toggleCameraFacing}
-              disabled={isCapturing}
-            >
-              <Ionicons name="camera-reverse" size={30} color="white" />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.captureButton, isCapturing && styles.buttonDisabled]}
-              onPress={handleCapture}
-              disabled={isCapturing}
-            >
-              <View style={styles.captureButtonInner} />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.closeButton}
-              onPress={onClose}
-              disabled={isCapturing}
-            >
-              <Ionicons name="close" size={30} color="white" />
-            </TouchableOpacity>
+        {previewImage ? (
+          // Preview Screen
+          <View style={styles.previewContainer}>
+            <Image source={{ uri: previewImage }} style={styles.previewImage} />
+            <View style={styles.previewButtons}>
+              <TouchableOpacity
+                style={[styles.previewButton, styles.retakeButton]}
+                onPress={handleRetake}
+                disabled={isCapturing}
+              >
+                <Ionicons name="refresh" size={24} color="white" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.previewButton, styles.acceptButton]}
+                onPress={handleAccept}
+                disabled={isCapturing}
+              >
+                <Ionicons name="checkmark" size={24} color="white" />
+              </TouchableOpacity>
+            </View>
           </View>
-        </ExpoCameraView>
+        ) : (
+          // Camera Screen
+          <ExpoCameraView 
+            ref={cameraRef}
+            style={styles.camera} 
+            facing={facing}
+          >
+            <View style={styles.buttonContainer}>
+              <TouchableOpacity
+                style={styles.flipButton}
+                onPress={toggleCameraFacing}
+                disabled={isCapturing}
+              >
+                <Ionicons name="camera-reverse" size={30} color="white" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.captureButton, isCapturing && styles.buttonDisabled]}
+                onPress={handleCapture}
+                disabled={isCapturing}
+              >
+                <View style={styles.captureButtonInner} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.closeButton}
+                onPress={onClose}
+                disabled={isCapturing}
+              >
+                <Ionicons name="close" size={30} color="white" />
+              </TouchableOpacity>
+            </View>
+          </ExpoCameraView>
+        )}
       </View>
     </Modal>
   );
@@ -155,5 +199,33 @@ const styles = StyleSheet.create({
   closeButton: {
     alignSelf: 'flex-end',
     marginBottom: 20,
+  },
+  previewContainer: {
+    flex: 1,
+    backgroundColor: 'black',
+  },
+  previewImage: {
+    flex: 1,
+    resizeMode: 'contain',
+  },
+  previewButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    paddingVertical: 20,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  previewButton: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  retakeButton: {
+    backgroundColor: '#FF3B30',
+  },
+  acceptButton: {
+    backgroundColor: '#34C759',
   },
 }); 
