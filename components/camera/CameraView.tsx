@@ -20,6 +20,7 @@ export function CameraView({ isVisible, onClose }: CameraViewProps) {
   const [isCapturing, setIsCapturing] = useState(false);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [analysis, setAnalysis] = useState<FoodAnalysis | null>(null);
+  const [imagePath, setImagePath] = useState<string | null>(null);
   const cameraRef = useRef<ExpoCameraView>(null);
 
   if (!isVisible) {
@@ -80,10 +81,11 @@ export function CameraView({ isVisible, onClose }: CameraViewProps) {
 
       // Get the relative path from the full URL
       const url = new URL(imageUrl);
-      const imagePath = url.pathname.split('/').slice(-2).join('/');
+      const path = url.pathname.split('/').slice(-2).join('/');
+      setImagePath(path);
 
       // Analyze the food image
-      const foodAnalysis = await analyzeFoodImage(imagePath);
+      const foodAnalysis = await analyzeFoodImage(path);
       setAnalysis(foodAnalysis);
 
     } catch (error) {
@@ -104,6 +106,7 @@ export function CameraView({ isVisible, onClose }: CameraViewProps) {
     // Reset state
     setPreviewImage(null);
     setAnalysis(null);
+    setImagePath(null);
   };
 
   return (
@@ -119,10 +122,14 @@ export function CameraView({ isVisible, onClose }: CameraViewProps) {
           <View style={styles.previewContainer}>
             <Image source={{ uri: previewImage }} style={styles.previewImage} />
             
-            {analysis ? (
+            {analysis && imagePath ? (
               // Analysis Results
               <>
-                <FoodAnalysisCard analysis={analysis} />
+                <FoodAnalysisCard 
+                  analysis={analysis} 
+                  imagePath={imagePath} 
+                  onSave={handleDone}
+                />
                 <TouchableOpacity
                   style={[styles.doneButton]}
                   onPress={handleDone}

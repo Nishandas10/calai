@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS public.food_logs (
     user_id UUID NOT NULL REFERENCES auth.users(id),
     image_path TEXT NOT NULL,
     ai_analysis JSONB NOT NULL,
+    user_adjustments JSONB,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
@@ -14,12 +15,47 @@ CREATE TABLE IF NOT EXISTS public.food_logs (
 -- Enable RLS on food_logs
 ALTER TABLE public.food_logs ENABLE ROW LEVEL SECURITY;
 
--- Create policy for food_logs
-CREATE POLICY "Users can view and create their own food logs"
-ON public.food_logs FOR ALL
+-- Grant access to authenticated users and service role
+GRANT ALL ON public.food_logs TO authenticated;
+GRANT ALL ON public.food_logs TO service_role;
+
+-- Create policies for food_logs table
+-- Policy for SELECT (Read)
+CREATE POLICY "Users can view their own food logs"
+ON public.food_logs
+FOR SELECT
 TO authenticated
-USING (user_id = auth.uid())
-WITH CHECK (user_id = auth.uid());
+USING (auth.uid() = user_id);
+
+-- Policy for INSERT (Create)
+CREATE POLICY "Users can create their own food logs"
+ON public.food_logs
+FOR INSERT
+TO authenticated
+WITH CHECK (auth.uid() = user_id);
+
+-- Policy for UPDATE (Update)
+CREATE POLICY "Users can update their own food logs"
+ON public.food_logs
+FOR UPDATE
+TO authenticated
+USING (auth.uid() = user_id)
+WITH CHECK (auth.uid() = user_id);
+
+-- Policy for DELETE (Delete)
+CREATE POLICY "Users can delete their own food logs"
+ON public.food_logs
+FOR DELETE
+TO authenticated
+USING (auth.uid() = user_id);
+
+-- Service role policy (full access)
+CREATE POLICY "Service role has full access to food_logs"
+ON public.food_logs
+FOR ALL
+TO service_role
+USING (true)
+WITH CHECK (true);
 
 -- Seed data for testing (optional)
 INSERT INTO storage.buckets (id, name, public)
@@ -85,14 +121,4 @@ CREATE POLICY "Users can view and edit their own nutrition targets"
 ON public.daily_nutrition_targets FOR ALL
 TO authenticated
 USING (user_id = auth.uid())
-WITH CHECK (user_id = auth.uid());
-
--- Grant access to the service role
-GRANT ALL ON public.food_logs TO service_role;
-
--- Create a policy for service role
-CREATE POLICY "Enable service role access to food_logs"
-ON public.food_logs FOR ALL
-TO service_role
-USING (true)
-WITH CHECK (true); 
+WITH CHECK (user_id = auth.uid()); 
