@@ -70,8 +70,37 @@ serve(async (req: Request) => {
       );
     }
 
+    // Get auth header
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: "No authorization header" }),
+        { headers: corsHeaders, status: 401 },
+      );
+    }
+
+    // Initialize Supabase client
+    const supabaseClient = createClient(supabaseUrl, supabaseServiceRoleKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    });
+
+    // Get user from auth header
+    const token = authHeader.replace("Bearer ", "");
+    const { data: { user }, error: userError } = await supabaseClient.auth
+      .getUser(token);
+
+    if (userError || !user) {
+      return new Response(
+        JSON.stringify({ error: "Invalid user token" }),
+        { headers: corsHeaders, status: 401 },
+      );
+    }
+
     // Parse and validate request body
-    const { imagePath, userId } = await req.json() as RequestBody;
+    const { imagePath } = await req.json() as RequestBody;
     if (!imagePath) {
       return new Response(
         JSON.stringify({ error: "Missing required field: imagePath" }),
@@ -79,13 +108,7 @@ serve(async (req: Request) => {
       );
     }
 
-    // Initialize clients
-    const supabaseClient = createClient(supabaseUrl, supabaseServiceRoleKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
-    });
+    // Initialize OpenAI client
     const openai = new OpenAI({ apiKey: openaiApiKey });
 
     // Get signed URL
@@ -112,7 +135,6 @@ serve(async (req: Request) => {
         messages: [
           {
             role: "user",
-
             content: [
               {
                 type: "text",
@@ -142,13 +164,13 @@ serve(async (req: Request) => {
         response.choices[0].message.content,
       );
 
-      // Store analysis in food_logs
+      // Store analysis in food_logs with user_id
       const { error: logError } = await supabaseClient
         .from("food_logs")
         .insert({
+          user_id: user.id,
           image_path: imagePath,
           ai_analysis: analysis,
-          user_id: userId,
         });
 
       if (logError) {

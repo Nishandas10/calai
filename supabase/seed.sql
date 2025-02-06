@@ -4,7 +4,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 -- Create food_logs table
 CREATE TABLE IF NOT EXISTS public.food_logs (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id UUID REFERENCES auth.users(id),
+    user_id UUID NOT NULL REFERENCES auth.users(id),
     image_path TEXT NOT NULL,
     ai_analysis JSONB NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
