@@ -4,7 +4,9 @@ import { CameraView as ExpoCameraView, useCameraPermissions } from 'expo-camera'
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/context/auth';
 import { uploadFoodImage } from '@/lib/services/storage';
+import { analyzeFoodImage, type FoodAnalysis } from '@/lib/services/food-analysis';
 import * as ImageManipulator from 'expo-image-manipulator';
+import { FoodAnalysisCard } from '../food/FoodAnalysisCard';
 
 interface CameraViewProps {
   isVisible: boolean;
@@ -17,6 +19,7 @@ export function CameraView({ isVisible, onClose }: CameraViewProps) {
   const [facing, setFacing] = useState<'back' | 'front'>('back');
   const [isCapturing, setIsCapturing] = useState(false);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [analysis, setAnalysis] = useState<FoodAnalysis | null>(null);
   const cameraRef = useRef<ExpoCameraView>(null);
 
   if (!isVisible) {
@@ -75,12 +78,17 @@ export function CameraView({ isVisible, onClose }: CameraViewProps) {
       const imageUrl = await uploadFoodImage(previewImage, session.user.id);
       console.log('Image uploaded successfully:', imageUrl);
 
-      // Close camera after successful upload
-      onClose();
-      Alert.alert('Success', 'Photo uploaded successfully!');
+      // Get the relative path from the full URL
+      const url = new URL(imageUrl);
+      const imagePath = url.pathname.split('/').slice(-2).join('/');
+
+      // Analyze the food image
+      const foodAnalysis = await analyzeFoodImage(imagePath);
+      setAnalysis(foodAnalysis);
+
     } catch (error) {
-      console.error('Error uploading photo:', error);
-      Alert.alert('Error', 'Failed to upload photo. Please try again.');
+      console.error('Error processing photo:', error);
+      Alert.alert('Error', 'Failed to process photo. Please try again.');
     } finally {
       setIsCapturing(false);
     }
@@ -88,6 +96,14 @@ export function CameraView({ isVisible, onClose }: CameraViewProps) {
 
   const handleRetake = () => {
     setPreviewImage(null);
+    setAnalysis(null);
+  };
+
+  const handleDone = () => {
+    onClose();
+    // Reset state
+    setPreviewImage(null);
+    setAnalysis(null);
   };
 
   return (
@@ -102,22 +118,38 @@ export function CameraView({ isVisible, onClose }: CameraViewProps) {
           // Preview Screen
           <View style={styles.previewContainer}>
             <Image source={{ uri: previewImage }} style={styles.previewImage} />
-            <View style={styles.previewButtons}>
-              <TouchableOpacity
-                style={[styles.previewButton, styles.retakeButton]}
-                onPress={handleRetake}
-                disabled={isCapturing}
-              >
-                <Ionicons name="refresh" size={24} color="white" />
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.previewButton, styles.acceptButton]}
-                onPress={handleAccept}
-                disabled={isCapturing}
-              >
-                <Ionicons name="checkmark" size={24} color="white" />
-              </TouchableOpacity>
-            </View>
+            
+            {analysis ? (
+              // Analysis Results
+              <>
+                <FoodAnalysisCard analysis={analysis} />
+                <TouchableOpacity
+                  style={[styles.doneButton]}
+                  onPress={handleDone}
+                  disabled={isCapturing}
+                >
+                  <Ionicons name="checkmark-circle" size={24} color="white" />
+                </TouchableOpacity>
+              </>
+            ) : (
+              // Accept/Retake Buttons
+              <View style={styles.previewButtons}>
+                <TouchableOpacity
+                  style={[styles.previewButton, styles.retakeButton]}
+                  onPress={handleRetake}
+                  disabled={isCapturing}
+                >
+                  <Ionicons name="refresh" size={24} color="white" />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.previewButton, styles.acceptButton]}
+                  onPress={handleAccept}
+                  disabled={isCapturing}
+                >
+                  <Ionicons name="checkmark" size={24} color="white" />
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
         ) : (
           // Camera Screen
@@ -205,7 +237,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'black',
   },
   previewImage: {
-    flex: 1,
+    height: '50%',
     resizeMode: 'contain',
   },
   previewButtons: {
@@ -227,5 +259,16 @@ const styles = StyleSheet.create({
   },
   acceptButton: {
     backgroundColor: '#34C759',
+  },
+  doneButton: {
+    position: 'absolute',
+    bottom: 20,
+    right: 20,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#34C759',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 }); 
