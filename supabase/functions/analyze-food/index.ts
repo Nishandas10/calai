@@ -7,7 +7,8 @@ import { OpenAI } from "https://esm.sh/openai@4.28.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
   "Content-Type": "application/json",
 };
 
@@ -38,7 +39,6 @@ declare global {
     interface Env {
       get(key: string): string | undefined;
     }
-    var env: Env;
   }
 }
 
@@ -62,11 +62,11 @@ serve(async (req: Request) => {
         hasOpenAIKey: !!openaiApiKey,
       });
       return new Response(
-        JSON.stringify({ 
-          error: "Server configuration error", 
-          details: "Missing required environment variables" 
+        JSON.stringify({
+          error: "Server configuration error",
+          details: "Missing required environment variables",
         }),
-        { headers: corsHeaders, status: 500 }
+        { headers: corsHeaders, status: 500 },
       );
     }
 
@@ -75,7 +75,7 @@ serve(async (req: Request) => {
     if (!imagePath) {
       return new Response(
         JSON.stringify({ error: "Missing required field: imagePath" }),
-        { headers: corsHeaders, status: 400 }
+        { headers: corsHeaders, status: 400 },
       );
     }
 
@@ -83,24 +83,25 @@ serve(async (req: Request) => {
     const supabaseClient = createClient(supabaseUrl, supabaseServiceRoleKey, {
       auth: {
         autoRefreshToken: false,
-        persistSession: false
-      }
+        persistSession: false,
+      },
     });
     const openai = new OpenAI({ apiKey: openaiApiKey });
 
     // Get signed URL
-    const { data: signedUrlData, error: signedUrlError } = await supabaseClient.storage
+    const { data: signedUrlData, error: signedUrlError } = await supabaseClient
+      .storage
       .from("food-images")
       .createSignedUrl(imagePath, 60);
 
     if (signedUrlError || !signedUrlData?.signedUrl) {
       console.error("Signed URL error:", signedUrlError);
       return new Response(
-        JSON.stringify({ 
+        JSON.stringify({
           error: "Failed to access image",
-          details: signedUrlError?.message 
+          details: signedUrlError?.message,
         }),
-        { headers: corsHeaders, status: 500 }
+        { headers: corsHeaders, status: 500 },
       );
     }
 
@@ -115,14 +116,15 @@ serve(async (req: Request) => {
             content: [
               {
                 type: "text",
-                text: "Analyze this food image and return a JSON object with the following format: {ingredients: [{name: string, calories: number, protein: number, carbs: number, fat: number}], total: {calories: number, protein: number, carbs: number, fat: number}}. Be precise with the measurements and ensure the totals are accurate sums of the ingredients.",
+                text:
+                  "Analyze this food image and return a JSON object with the following format: {ingredients: [{name: string, calories: number, protein: number, carbs: number, fat: number}], total: {calories: number, protein: number, carbs: number, fat: number}}. Be precise with the measurements and ensure the totals are accurate sums of the ingredients.",
               },
               {
                 type: "image_url",
                 image_url: {
                   url: signedUrlData.signedUrl,
-                  detail: "high"
-                }
+                  detail: "high",
+                },
               },
             ],
           },
@@ -136,7 +138,9 @@ serve(async (req: Request) => {
         throw new Error("No response from OpenAI");
       }
 
-      const analysis: FoodAnalysis = JSON.parse(response.choices[0].message.content);
+      const analysis: FoodAnalysis = JSON.parse(
+        response.choices[0].message.content,
+      );
 
       // Store analysis in food_logs
       const { error: logError } = await supabaseClient
@@ -150,38 +154,40 @@ serve(async (req: Request) => {
       if (logError) {
         console.error("Database error:", logError);
         return new Response(
-          JSON.stringify({ 
+          JSON.stringify({
             error: "Failed to store analysis",
-            details: logError.message 
+            details: logError.message,
           }),
-          { headers: corsHeaders, status: 500 }
+          { headers: corsHeaders, status: 500 },
         );
       }
 
       return new Response(
         JSON.stringify(analysis),
-        { headers: corsHeaders, status: 200 }
+        { headers: corsHeaders, status: 200 },
       );
-
     } catch (openAiError) {
       console.error("OpenAI API error:", openAiError);
       return new Response(
-        JSON.stringify({ 
+        JSON.stringify({
           error: "Failed to analyze image",
-          details: openAiError instanceof Error ? openAiError.message : "Unknown OpenAI error"
+          details: openAiError instanceof Error
+            ? openAiError.message
+            : "Unknown OpenAI error",
         }),
-        { headers: corsHeaders, status: 500 }
+        { headers: corsHeaders, status: 500 },
       );
     }
-
   } catch (error) {
     console.error("Unexpected error:", error);
     return new Response(
-      JSON.stringify({ 
+      JSON.stringify({
         error: "Internal server error",
-        details: error instanceof Error ? error.message : "Unknown error occurred"
+        details: error instanceof Error
+          ? error.message
+          : "Unknown error occurred",
       }),
-      { headers: corsHeaders, status: 500 }
+      { headers: corsHeaders, status: 500 },
     );
   }
 });
