@@ -7,6 +7,7 @@ import { CircularProgress } from '@/components/ui/circular-progress';
 import { Card } from '@/components/ui/card';
 import { Camera } from 'expo-camera';
 import { CameraView } from '@/components/camera/CameraView';
+import RecentFoodLogs from '@/components/food/RecentFoodLogs';
 
 interface DailyNutrition {
   target_calories: number;
@@ -219,14 +220,7 @@ export default function DashboardScreen() {
 
         <View style={styles.recentSection}>
           <Text style={styles.sectionTitle}>Recently eaten</Text>
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyStateText}>
-              You haven't uploaded any food
-            </Text>
-            <Text style={styles.emptyStateSubtext}>
-              Start tracking Today's meals by taking a quick pictures
-            </Text>
-          </View>
+          <RecentFoodLogs />
         </View>
       </ScrollView>
 
