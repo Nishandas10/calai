@@ -6,7 +6,7 @@ import { useAuth } from '@/context/auth';
 import { uploadFoodImage } from '@/lib/services/storage';
 import { analyzeFoodImage, type FoodAnalysis } from '@/lib/services/food-analysis';
 import * as ImageManipulator from 'expo-image-manipulator';
-import { FoodAnalysisCard } from '../food/FoodAnalysisCard';
+import FoodAnalysisCard from '../food/FoodAnalysisCard';
 
 interface CameraViewProps {
   isVisible: boolean;

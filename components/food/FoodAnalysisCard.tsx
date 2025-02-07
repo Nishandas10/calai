@@ -1,9 +1,34 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Alert } from 'react-native';
 import { Card } from '@/components/ui/card';
-import type { FoodAnalysis } from '@/lib/services/food-analysis';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/auth';
+
+interface Ingredient {
+  name: string;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+}
+
+interface EditableIngredient {
+  name: string;
+  calories: number | string;
+  protein: number | string;
+  carbs: number | string;
+  fat: number | string;
+}
+
+interface FoodAnalysis {
+  ingredients: Ingredient[];
+  total: {
+    calories: number;
+    protein: number;
+    carbs: number;
+    fat: number;
+  };
+}
 
 interface FoodAnalysisCardProps {
   analysis: FoodAnalysis;
@@ -11,10 +36,19 @@ interface FoodAnalysisCardProps {
   onSave?: () => void;
 }
 
-export function FoodAnalysisCard({ analysis: initialAnalysis, imagePath, onSave }: FoodAnalysisCardProps) {
+export default function FoodAnalysisCard({ analysis: initialAnalysis, imagePath, onSave }: FoodAnalysisCardProps) {
   const { session } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
-  const [analysis, setAnalysis] = useState(initialAnalysis);
+  const [analysis, setAnalysis] = useState<FoodAnalysis>(initialAnalysis);
+  const [editableAnalysis, setEditableAnalysis] = useState<{ ingredients: EditableIngredient[] }>({ 
+    ingredients: initialAnalysis.ingredients.map(ing => ({
+      ...ing,
+      calories: ing.calories.toString(),
+      protein: ing.protein.toString(),
+      carbs: ing.carbs.toString(),
+      fat: ing.fat.toString()
+    }))
+  });
   const [isSaving, setIsSaving] = useState(false);
 
   const handleEdit = () => {
@@ -57,18 +91,34 @@ export function FoodAnalysisCard({ analysis: initialAnalysis, imagePath, onSave 
     setIsEditing(false);
   };
 
-  const updateIngredient = (index: number, field: keyof typeof analysis.ingredients[0], value: string) => {
-    const newValue = parseFloat(value) || 0;
+  const updateIngredient = (index: number, field: keyof Omit<EditableIngredient, 'name'>, value: string) => {
+    // Allow empty string for better UX while typing
+    if (value === '' || value === '.') {
+      const newEditableAnalysis = { ...editableAnalysis };
+      newEditableAnalysis.ingredients[index][field] = value;
+      setEditableAnalysis(newEditableAnalysis);
+      return;
+    }
+
+    // Parse float and handle invalid inputs
+    const newValue = parseFloat(value);
+    if (isNaN(newValue)) return;
+
+    const newEditableAnalysis = { ...editableAnalysis };
+    newEditableAnalysis.ingredients[index][field] = value;
+    setEditableAnalysis(newEditableAnalysis);
+
+    // Update the actual analysis with numbers
     const newAnalysis = { ...analysis };
     newAnalysis.ingredients[index][field] = newValue;
 
     // Recalculate totals
     newAnalysis.total = newAnalysis.ingredients.reduce(
       (acc, curr) => ({
-        calories: acc.calories + curr.calories,
-        protein: acc.protein + curr.protein,
-        carbs: acc.carbs + curr.carbs,
-        fat: acc.fat + curr.fat,
+        calories: Number((acc.calories + curr.calories).toFixed(1)),
+        protein: Number((acc.protein + curr.protein).toFixed(1)),
+        carbs: Number((acc.carbs + curr.carbs).toFixed(1)),
+        fat: Number((acc.fat + curr.fat).toFixed(1)),
       }),
       { calories: 0, protein: 0, carbs: 0, fat: 0 }
     );
@@ -111,45 +161,49 @@ export function FoodAnalysisCard({ analysis: initialAnalysis, imagePath, onSave 
                     <Text style={styles.macroLabel}>Calories:</Text>
                     <TextInput
                       style={styles.input}
-                      value={ingredient.calories.toString()}
+                      value={editableAnalysis.ingredients[index].calories.toString()}
                       onChangeText={(value) => updateIngredient(index, 'calories', value)}
-                      keyboardType="numeric"
+                      keyboardType="decimal-pad"
+                      maxLength={5}
                     />
                   </View>
                   <View style={styles.macroInput}>
                     <Text style={styles.macroLabel}>Protein (g):</Text>
                     <TextInput
                       style={styles.input}
-                      value={ingredient.protein.toString()}
+                      value={editableAnalysis.ingredients[index].protein.toString()}
                       onChangeText={(value) => updateIngredient(index, 'protein', value)}
-                      keyboardType="numeric"
+                      keyboardType="decimal-pad"
+                      maxLength={5}
                     />
                   </View>
                   <View style={styles.macroInput}>
                     <Text style={styles.macroLabel}>Carbs (g):</Text>
                     <TextInput
                       style={styles.input}
-                      value={ingredient.carbs.toString()}
+                      value={editableAnalysis.ingredients[index].carbs.toString()}
                       onChangeText={(value) => updateIngredient(index, 'carbs', value)}
-                      keyboardType="numeric"
+                      keyboardType="decimal-pad"
+                      maxLength={5}
                     />
                   </View>
                   <View style={styles.macroInput}>
                     <Text style={styles.macroLabel}>Fat (g):</Text>
                     <TextInput
                       style={styles.input}
-                      value={ingredient.fat.toString()}
+                      value={editableAnalysis.ingredients[index].fat.toString()}
                       onChangeText={(value) => updateIngredient(index, 'fat', value)}
-                      keyboardType="numeric"
+                      keyboardType="decimal-pad"
+                      maxLength={5}
                     />
                   </View>
                 </>
               ) : (
                 <>
-                  <Text style={styles.macroText}>{ingredient.calories} cal</Text>
-                  <Text style={styles.macroText}>{ingredient.protein}g protein</Text>
-                  <Text style={styles.macroText}>{ingredient.carbs}g carbs</Text>
-                  <Text style={styles.macroText}>{ingredient.fat}g fat</Text>
+                  <Text style={styles.macroText}>{ingredient.calories.toFixed(1)} cal</Text>
+                  <Text style={styles.macroText}>{ingredient.protein.toFixed(1)}g protein</Text>
+                  <Text style={styles.macroText}>{ingredient.carbs.toFixed(1)}g carbs</Text>
+                  <Text style={styles.macroText}>{ingredient.fat.toFixed(1)}g fat</Text>
                 </>
               )}
             </View>
@@ -160,10 +214,10 @@ export function FoodAnalysisCard({ analysis: initialAnalysis, imagePath, onSave 
       <View style={styles.totalContainer}>
         <Text style={styles.totalTitle}>Total</Text>
         <View style={styles.totalMacros}>
-          <Text style={styles.totalText}>{analysis.total.calories} calories</Text>
-          <Text style={styles.totalText}>{analysis.total.protein}g protein</Text>
-          <Text style={styles.totalText}>{analysis.total.carbs}g carbs</Text>
-          <Text style={styles.totalText}>{analysis.total.fat}g fat</Text>
+          <Text style={styles.totalText}>{analysis.total.calories.toFixed(1)} calories</Text>
+          <Text style={styles.totalText}>{analysis.total.protein.toFixed(1)}g protein</Text>
+          <Text style={styles.totalText}>{analysis.total.carbs.toFixed(1)}g carbs</Text>
+          <Text style={styles.totalText}>{analysis.total.fat.toFixed(1)}g fat</Text>
         </View>
       </View>
     </Card>
