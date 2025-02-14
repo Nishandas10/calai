@@ -30,6 +30,39 @@ export function CameraView({ isVisible, onClose }: CameraViewProps) {
   const [scannedBarcode, setScannedBarcode] = useState<string | null>(null);
   const scanLineAnim = useRef(new Animated.Value(0)).current;
   const cameraRef = useRef<ExpoCameraView>(null);
+  const lastScanTime = useRef<number>(0);
+  const scanTimeout = useRef<NodeJS.Timeout>();
+  const scanAttempts = useRef<number>(0);
+
+  // Reset scanner state when visibility changes
+  useEffect(() => {
+    if (!isVisible) {
+      resetScannerState();
+    }
+  }, [isVisible]);
+
+  // Cleanup timeouts and animations
+  useEffect(() => {
+    return () => {
+      if (scanTimeout.current) {
+        clearTimeout(scanTimeout.current);
+      }
+      scanLineAnim.stopAnimation();
+      resetScannerState();
+    };
+  }, []);
+
+  // Function to reset all scanner-related state
+  const resetScannerState = () => {
+    setScannedBarcode(null);
+    setIsScanning(false);
+    lastScanTime.current = 0;
+    scanAttempts.current = 0;
+    if (scanTimeout.current) {
+      clearTimeout(scanTimeout.current);
+    }
+    scanLineAnim.setValue(0);
+  };
 
   // Add scanning animation
   useEffect(() => {
@@ -51,6 +84,10 @@ export function CameraView({ isVisible, onClose }: CameraViewProps) {
     } else {
       scanLineAnim.setValue(0);
     }
+
+    return () => {
+      scanLineAnim.stopAnimation();
+    };
   }, [isScanning]);
 
   if (!isVisible) {
@@ -136,8 +173,8 @@ export function CameraView({ isVisible, onClose }: CameraViewProps) {
   };
 
   const handleDone = () => {
+    resetScannerState();
     onClose();
-    // Reset state
     setPreviewImage(null);
     setAnalysis(null);
     setImagePath(null);
@@ -161,51 +198,124 @@ export function CameraView({ isVisible, onClose }: CameraViewProps) {
     }
   };
 
-  // Update barcode scanning handler with correct FoodAnalysis type
+  // Update barcode scanning handler with delay, debounce, and retry logic
   const handleBarcodeScanned = async ({ data }: BarcodeScanningResult) => {
+    const now = Date.now();
+    const SCAN_DELAY = 2000; // 2 seconds between scans
+    const MAX_ATTEMPTS = 3; // Maximum number of scan attempts before showing error
+    
     if (scannedBarcode || !isScanningBarcode) return;
+    if (now - lastScanTime.current < SCAN_DELAY) return;
+    
+    lastScanTime.current = now;
+    setScannedBarcode(data);
+    setIsScanning(true);
+    scanAttempts.current += 1;
+
+    // Clear any existing timeout
+    if (scanTimeout.current) {
+      clearTimeout(scanTimeout.current);
+    }
     
     try {
-      setScannedBarcode(data);
-      setIsScanning(true);
-      
       const productData = await getProductByBarcode(data);
       const savedProduct = await saveProductToDatabase(productData);
       
+      // Reset scan attempts on success
+      scanAttempts.current = 0;
+      
       // Convert product data to FoodAnalysis format
-      setAnalysis({
+      const analysis: FoodAnalysis = {
         ingredients: [{
           name: productData.product.product_name,
-          calories: productData.product.nutriments['energy-kcal_100g'],
-          protein: productData.product.nutriments.proteins_100g,
-          carbs: productData.product.nutriments.carbohydrates_100g,
-          fat: productData.product.nutriments.fat_100g
+          calories: Math.round(productData.product.nutriments['energy-kcal_100g'] || 0),
+          protein: Number((productData.product.nutriments.proteins_100g || 0).toFixed(1)),
+          carbs: Number((productData.product.nutriments.carbohydrates_100g || 0).toFixed(1)),
+          fat: Number((productData.product.nutriments.fat_100g || 0).toFixed(1))
         }],
         total: {
-          calories: productData.product.nutriments['energy-kcal_100g'],
-          protein: productData.product.nutriments.proteins_100g,
-          carbs: productData.product.nutriments.carbohydrates_100g,
-          fat: productData.product.nutriments.fat_100g
+          calories: Math.round(productData.product.nutriments['energy-kcal_100g'] || 0),
+          protein: Number((productData.product.nutriments.proteins_100g || 0).toFixed(1)),
+          carbs: Number((productData.product.nutriments.carbohydrates_100g || 0).toFixed(1)),
+          fat: Number((productData.product.nutriments.fat_100g || 0).toFixed(1))
         }
-      });
+      };
       
+      setAnalysis(analysis);
       setImagePath(productData.product.image_url);
       setPreviewImage(productData.product.image_url);
       
     } catch (error) {
-      console.error('Error scanning barcode:', error);
-      Alert.alert('Error', 'Could not find product information');
-      setScannedBarcode(null);
+      // Only show error dialog if we've reached max attempts
+      if (scanAttempts.current >= MAX_ATTEMPTS) {
+        scanTimeout.current = setTimeout(() => {
+          if (error instanceof Error) {
+            switch (error.message) {
+              case "PRODUCT_NOT_FOUND":
+                Alert.alert(
+                  'Product Not Found',
+                  'This product was not found in our database. Please try scanning another product.',
+                  [{ 
+                    text: 'OK', 
+                    onPress: () => {
+                      setScannedBarcode(null);
+                      scanAttempts.current = 0;
+                    }
+                  }]
+                );
+                break;
+              case "INVALID_PRODUCT_DATA":
+                Alert.alert(
+                  'Invalid Product Data',
+                  'The product was found but has incomplete nutritional information.',
+                  [{ text: 'OK', onPress: () => setScannedBarcode(null) }]
+                );
+                break;
+              case "TIMEOUT":
+                Alert.alert(
+                  'Connection Timeout',
+                  'The request took too long. Please check your internet connection and try again.',
+                  [{ text: 'OK', onPress: () => setScannedBarcode(null) }]
+                );
+                break;
+              case "TOO_MANY_REQUESTS":
+                Alert.alert(
+                  'Too Many Requests',
+                  'Please wait a moment before scanning again.',
+                  [{ text: 'OK', onPress: () => setScannedBarcode(null) }]
+                );
+                break;
+              default:
+                Alert.alert(
+                  'Error',
+                  'Failed to scan product. Please try again.',
+                  [{ text: 'OK', onPress: () => setScannedBarcode(null) }]
+                );
+            }
+          }
+        }, 1500);
+      } else {
+        // If we haven't reached max attempts, just reset the scanned barcode
+        setScannedBarcode(null);
+      }
     } finally {
       setIsScanning(false);
     }
   };
 
-  // Toggle between barcode scanning and photo mode
+  // Update toggleScanMode to properly handle mode switching
   const toggleScanMode = () => {
-    setIsScanningBarcode(!isScanningBarcode);
+    // Clear any existing timeouts and reset scan-related state
+    if (scanTimeout.current) {
+      clearTimeout(scanTimeout.current);
+    }
     setScannedBarcode(null);
     setIsScanning(false);
+    lastScanTime.current = 0;
+    scanAttempts.current = 0;
+    
+    // Toggle the scanning mode
+    setIsScanningBarcode(prev => !prev);
   };
 
   return (

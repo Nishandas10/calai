@@ -31,11 +31,66 @@ export async function getProductByBarcode(
     barcode: string,
 ): Promise<ProductData> {
     try {
+        // Add timeout to the request
         const response = await axios.get(
             `${OPENFOODFACTS_API}/product/${barcode}.json`,
+            { timeout: 10000 }, // 10 second timeout
         );
+
+        // Log response status for debugging (temporary)
+        console.log("API Response:", {
+            status: response.data.status,
+            statusVerbose: response.data.status_verbose,
+            productExists: !!response.data.product,
+        });
+
+        // More detailed validation
+        if (!response.data) {
+            throw new Error("INVALID_RESPONSE");
+        }
+
+        // Check both status and product existence
+        if (response.data.status !== 1) {
+            throw new Error("PRODUCT_NOT_FOUND");
+        }
+
+        if (!response.data.product) {
+            throw new Error("PRODUCT_NOT_FOUND");
+        }
+
+        // Validate required product data
+        const product = response.data.product;
+        if (!product.product_name || !product.nutriments) {
+            throw new Error("INVALID_PRODUCT_DATA");
+        }
+
         return response.data;
     } catch (error) {
+        if (axios.isAxiosError(error)) {
+            if (error.code === "ECONNABORTED") {
+                throw new Error("TIMEOUT");
+            }
+            if (error.response?.status === 404) {
+                throw new Error("PRODUCT_NOT_FOUND");
+            }
+            if (error.response?.status === 429) {
+                throw new Error("TOO_MANY_REQUESTS");
+            }
+        }
+
+        if (error instanceof Error) {
+            if (
+                error.message === "PRODUCT_NOT_FOUND" ||
+                error.message === "INVALID_PRODUCT_DATA" ||
+                error.message === "TIMEOUT" ||
+                error.message === "TOO_MANY_REQUESTS"
+            ) {
+                throw error;
+            }
+        }
+
+        // For other errors, log and throw generic error
+        console.error("Error fetching product data:", error);
         throw new Error("Failed to fetch product data");
     }
 }
