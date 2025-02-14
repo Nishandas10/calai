@@ -8,6 +8,8 @@ import { analyzeFoodImage, type FoodAnalysis } from '@/lib/services/food-analysi
 import { getProductByBarcode, saveProductToDatabase } from '@/lib/services/food-database';
 import * as ImageManipulator from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system';
+import { supabase } from '@/lib/supabase';
 import FoodAnalysisCard from '../food/FoodAnalysisCard';
 import type { FlashMode } from 'expo-camera';
 
@@ -62,6 +64,21 @@ export function CameraView({ isVisible, onClose }: CameraViewProps) {
       clearTimeout(scanTimeout.current);
     }
     scanLineAnim.setValue(0);
+  };
+
+  // Update toggleScanMode to properly handle mode switching
+  const toggleScanMode = () => {
+    // Clear any existing timeouts and reset scan-related state
+    if (scanTimeout.current) {
+      clearTimeout(scanTimeout.current);
+    }
+    setScannedBarcode(null);
+    setIsScanning(false);
+    lastScanTime.current = 0;
+    scanAttempts.current = 0;
+    
+    // Toggle the scanning mode
+    setIsScanningBarcode(prev => !prev);
   };
 
   // Add scanning animation
@@ -204,7 +221,7 @@ export function CameraView({ isVisible, onClose }: CameraViewProps) {
     const SCAN_DELAY = 2000; // 2 seconds between scans
     const MAX_ATTEMPTS = 3; // Maximum number of scan attempts before showing error
     
-    if (scannedBarcode || !isScanningBarcode) return;
+    if (scannedBarcode || !isScanningBarcode || !session?.user?.id) return;
     if (now - lastScanTime.current < SCAN_DELAY) return;
     
     lastScanTime.current = now;
@@ -219,6 +236,46 @@ export function CameraView({ isVisible, onClose }: CameraViewProps) {
     
     try {
       const productData = await getProductByBarcode(data);
+      
+      // Download and store the product image if available
+      let storedImagePath = null;
+      if (productData.product.image_url) {
+        try {
+          // Download the image to local filesystem first
+          const filename = `${Date.now()}.jpg`;
+          const localUri = `${FileSystem.cacheDirectory}${filename}`;
+          
+          const downloadResult = await FileSystem.downloadAsync(
+            productData.product.image_url,
+            localUri
+          );
+          
+          if (downloadResult.status === 200) {
+            // Process the image with ImageManipulator
+            const manipResult = await ImageManipulator.manipulateAsync(
+              localUri,
+              [{ resize: { width: 1080 } }],
+              { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG }
+            );
+            
+            // Upload the processed image to Supabase storage and get the path
+            const uploadedUrl = await uploadFoodImage(manipResult.uri, session.user.id);
+            // Extract just the path part from the full URL
+            const urlObj = new URL(uploadedUrl);
+            storedImagePath = urlObj.pathname.split('/').slice(-2).join('/');
+            
+            // Clean up the temporary file
+            await FileSystem.deleteAsync(localUri, { idempotent: true });
+            await FileSystem.deleteAsync(manipResult.uri, { idempotent: true });
+            
+            console.log('Product image stored successfully:', storedImagePath);
+          }
+        } catch (imageError) {
+          console.error('Error storing product image:', imageError);
+          // Continue with the process even if image storage fails
+        }
+      }
+      
       const savedProduct = await saveProductToDatabase(productData);
       
       // Reset scan attempts on success
@@ -242,8 +299,31 @@ export function CameraView({ isVisible, onClose }: CameraViewProps) {
       };
       
       setAnalysis(analysis);
-      setImagePath(productData.product.image_url);
-      setPreviewImage(productData.product.image_url);
+      // Use the stored image path if available, otherwise fallback to the original URL
+      const finalImagePath = storedImagePath || productData.product.image_url;
+      setImagePath(finalImagePath);
+      setPreviewImage(storedImagePath 
+        ? supabase.storage.from('food-images').getPublicUrl(storedImagePath).data.publicUrl 
+        : productData.product.image_url
+      );
+      
+      // Save to food_logs table
+      try {
+        const { error: logError } = await supabase
+          .from('food_logs')
+          .insert({
+            user_id: session.user.id,
+            image_path: finalImagePath,
+            ai_analysis: analysis,
+            user_adjustments: null,
+            created_at: new Date().toISOString()
+          });
+
+        if (logError) throw logError;
+      } catch (logError) {
+        console.error('Error saving to food logs:', logError);
+        // Continue even if logging fails
+      }
       
     } catch (error) {
       // Only show error dialog if we've reached max attempts
@@ -301,21 +381,6 @@ export function CameraView({ isVisible, onClose }: CameraViewProps) {
     } finally {
       setIsScanning(false);
     }
-  };
-
-  // Update toggleScanMode to properly handle mode switching
-  const toggleScanMode = () => {
-    // Clear any existing timeouts and reset scan-related state
-    if (scanTimeout.current) {
-      clearTimeout(scanTimeout.current);
-    }
-    setScannedBarcode(null);
-    setIsScanning(false);
-    lastScanTime.current = 0;
-    scanAttempts.current = 0;
-    
-    // Toggle the scanning mode
-    setIsScanningBarcode(prev => !prev);
   };
 
   return (
