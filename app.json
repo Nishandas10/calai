@@ -59,7 +59,8 @@
         {
           "cameraPermission": "Allow $CalAI to access your camera."
         }
-      ]
+      ],
+      "expo-barcode-scanner"
     ],
     "experiments": {
       "typedRoutes": true

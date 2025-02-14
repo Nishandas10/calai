@@ -1,10 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { View, TouchableOpacity, StyleSheet, Modal, Alert, Image, Animated, Text } from 'react-native';
-import { Camera, CameraView as ExpoCameraView, useCameraPermissions } from 'expo-camera';
+import { Camera, CameraView as ExpoCameraView, useCameraPermissions, BarcodeScanningResult } from 'expo-camera';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/context/auth';
 import { uploadFoodImage } from '@/lib/services/storage';
 import { analyzeFoodImage, type FoodAnalysis } from '@/lib/services/food-analysis';
+import { getProductByBarcode, saveProductToDatabase } from '@/lib/services/food-database';
 import * as ImageManipulator from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
 import FoodAnalysisCard from '../food/FoodAnalysisCard';
@@ -25,6 +26,8 @@ export function CameraView({ isVisible, onClose }: CameraViewProps) {
   const [imagePath, setImagePath] = useState<string | null>(null);
   const [flashMode, setFlashMode] = useState<FlashMode>('off');
   const [isScanning, setIsScanning] = useState(false);
+  const [isScanningBarcode, setIsScanningBarcode] = useState(false);
+  const [scannedBarcode, setScannedBarcode] = useState<string | null>(null);
   const scanLineAnim = useRef(new Animated.Value(0)).current;
   const cameraRef = useRef<ExpoCameraView>(null);
 
@@ -158,6 +161,53 @@ export function CameraView({ isVisible, onClose }: CameraViewProps) {
     }
   };
 
+  // Update barcode scanning handler with correct FoodAnalysis type
+  const handleBarcodeScanned = async ({ data }: BarcodeScanningResult) => {
+    if (scannedBarcode || !isScanningBarcode) return;
+    
+    try {
+      setScannedBarcode(data);
+      setIsScanning(true);
+      
+      const productData = await getProductByBarcode(data);
+      const savedProduct = await saveProductToDatabase(productData);
+      
+      // Convert product data to FoodAnalysis format
+      setAnalysis({
+        ingredients: [{
+          name: productData.product.product_name,
+          calories: productData.product.nutriments['energy-kcal_100g'],
+          protein: productData.product.nutriments.proteins_100g,
+          carbs: productData.product.nutriments.carbohydrates_100g,
+          fat: productData.product.nutriments.fat_100g
+        }],
+        total: {
+          calories: productData.product.nutriments['energy-kcal_100g'],
+          protein: productData.product.nutriments.proteins_100g,
+          carbs: productData.product.nutriments.carbohydrates_100g,
+          fat: productData.product.nutriments.fat_100g
+        }
+      });
+      
+      setImagePath(productData.product.image_url);
+      setPreviewImage(productData.product.image_url);
+      
+    } catch (error) {
+      console.error('Error scanning barcode:', error);
+      Alert.alert('Error', 'Could not find product information');
+      setScannedBarcode(null);
+    } finally {
+      setIsScanning(false);
+    }
+  };
+
+  // Toggle between barcode scanning and photo mode
+  const toggleScanMode = () => {
+    setIsScanningBarcode(!isScanningBarcode);
+    setScannedBarcode(null);
+    setIsScanning(false);
+  };
+
   return (
     <Modal
       animationType="slide"
@@ -217,10 +267,17 @@ export function CameraView({ isVisible, onClose }: CameraViewProps) {
             ref={cameraRef}
             style={styles.camera} 
             facing={facing}
+            barcodeScannerSettings={{
+              barcodeTypes: ['ean13', 'ean8'],
+            }}
+            onBarcodeScanned={isScanningBarcode ? handleBarcodeScanned : undefined}
           >
             {/* Scanner Overlay */}
             <View style={styles.scannerOverlay}>
-              <View style={styles.scannerFrame}>
+              <View style={[
+                styles.scannerFrame,
+                isScanningBarcode && styles.barcodeScannerFrame
+              ]}>
                 <Animated.View
                   style={[
                     styles.scanLine,
@@ -228,13 +285,18 @@ export function CameraView({ isVisible, onClose }: CameraViewProps) {
                       transform: [{
                         translateY: scanLineAnim.interpolate({
                           inputRange: [0, 1],
-                          outputRange: [0, 300]
+                          outputRange: [0, isScanningBarcode ? 100 : 300]
                         })
                       }]
                     }
                   ]}
                 />
               </View>
+              {isScanningBarcode && (
+                <Text style={styles.scannerText}>
+                  Position barcode within the frame
+                </Text>
+              )}
             </View>
             
             <View style={styles.controlsContainer}>
@@ -251,12 +313,6 @@ export function CameraView({ isVisible, onClose }: CameraViewProps) {
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.controlButton}
-                  onPress={toggleCameraFacing}
-                >
-                  <Ionicons name="camera-reverse" size={24} color="white" />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.controlButton}
                   onPress={onClose}
                 >
                   <Ionicons name="close" size={24} color="white" />
@@ -270,14 +326,25 @@ export function CameraView({ isVisible, onClose }: CameraViewProps) {
                 >
                   <Ionicons name="images" size={30} color="white" />
                 </TouchableOpacity>
+                {!isScanningBarcode && (
+                  <TouchableOpacity
+                    style={[styles.captureButton, isCapturing && styles.buttonDisabled]}
+                    onPress={handleCapture}
+                    disabled={isCapturing}
+                  >
+                    <View style={styles.captureButtonInner} />
+                  </TouchableOpacity>
+                )}
                 <TouchableOpacity
-                  style={[styles.captureButton, isCapturing && styles.buttonDisabled]}
-                  onPress={handleCapture}
-                  disabled={isCapturing}
+                  style={[styles.scanButton, isScanningBarcode && styles.scanButtonActive]}
+                  onPress={toggleScanMode}
                 >
-                  <View style={styles.captureButtonInner} />
+                  <Ionicons 
+                    name={isScanningBarcode ? "camera" : "barcode"} 
+                    size={24} 
+                    color="white" 
+                  />
                 </TouchableOpacity>
-                <View style={styles.placeholderButton} />
               </View>
             </View>
           </ExpoCameraView>
@@ -408,7 +475,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     flexDirection: 'row',
-    justifyContent: 'space-around',
+    justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
   },
@@ -441,5 +508,30 @@ const styles = StyleSheet.create({
     color: 'white',
     marginTop: 4,
     fontSize: 12,
+  },
+  barcodeScannerFrame: {
+    width: 280,
+    height: 100,
+    borderColor: '#2f95dc',
+  },
+  scannerText: {
+    color: 'white',
+    fontSize: 14,
+    marginTop: 20,
+    textAlign: 'center',
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    padding: 10,
+    borderRadius: 5,
+  },
+  scanButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  scanButtonActive: {
+    backgroundColor: '#2f95dc',
   },
 }); 

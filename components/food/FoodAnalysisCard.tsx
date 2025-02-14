@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Alert } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { Card } from '@/components/ui/card';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/auth';
@@ -39,17 +39,174 @@ interface FoodAnalysisCardProps {
 export default function FoodAnalysisCard({ analysis: initialAnalysis, imagePath, onSave }: FoodAnalysisCardProps) {
   const { session } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
-  const [analysis, setAnalysis] = useState<FoodAnalysis>(initialAnalysis);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [analysis, setAnalysis] = useState<FoodAnalysis | null>(null);
   const [editableAnalysis, setEditableAnalysis] = useState<{ ingredients: EditableIngredient[] }>({ 
-    ingredients: initialAnalysis.ingredients.map(ing => ({
-      ...ing,
-      calories: ing.calories.toString(),
-      protein: ing.protein.toString(),
-      carbs: ing.carbs.toString(),
-      fat: ing.fat.toString()
-    }))
+    ingredients: []
   });
   const [isSaving, setIsSaving] = useState(false);
+
+  // Initialize data with mounted check
+  useEffect(() => {
+    let mounted = true;
+
+    const initializeData = async () => {
+      try {
+        if (!initialAnalysis?.ingredients?.length || !initialAnalysis?.total) {
+          throw new Error('Invalid analysis data');
+        }
+
+        // Ensure all numeric values are properly initialized
+        const safeIngredients: Ingredient[] = initialAnalysis.ingredients.map(ing => ({
+          name: ing.name || 'Unknown Item',
+          calories: typeof ing.calories === 'number' ? ing.calories : 0,
+          protein: typeof ing.protein === 'number' ? ing.protein : 0,
+          carbs: typeof ing.carbs === 'number' ? ing.carbs : 0,
+          fat: typeof ing.fat === 'number' ? ing.fat : 0
+        }));
+
+        const safeTotal: FoodAnalysis['total'] = {
+          calories: typeof initialAnalysis.total.calories === 'number' ? initialAnalysis.total.calories : 0,
+          protein: typeof initialAnalysis.total.protein === 'number' ? initialAnalysis.total.protein : 0,
+          carbs: typeof initialAnalysis.total.carbs === 'number' ? initialAnalysis.total.carbs : 0,
+          fat: typeof initialAnalysis.total.fat === 'number' ? initialAnalysis.total.fat : 0
+        };
+
+        const safeAnalysis: FoodAnalysis = {
+          ingredients: safeIngredients,
+          total: safeTotal
+        };
+
+        if (mounted) {
+          // Set analysis with safe values
+          setAnalysis(safeAnalysis);
+
+          // Initialize editable analysis with safe string values
+          setEditableAnalysis({
+            ingredients: safeIngredients.map(ing => ({
+              name: ing.name,
+              calories: ing.calories.toString(),
+              protein: ing.protein.toString(),
+              carbs: ing.carbs.toString(),
+              fat: ing.fat.toString()
+            }))
+          });
+
+          setError(null);
+        }
+      } catch (err) {
+        if (mounted) {
+          setError('Failed to load analysis data');
+          console.error('Error initializing FoodAnalysisCard:', err);
+        }
+      } finally {
+        if (mounted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    initializeData();
+
+    // Cleanup function to prevent memory leaks
+    return () => {
+      mounted = false;
+    };
+  }, [initialAnalysis]);
+
+  // Safe number formatting helper
+  const formatNumber = (value: number | undefined | null): string => {
+    if (typeof value !== 'number' || isNaN(value)) return '0.0';
+    return value.toFixed(1);
+  };
+
+  // Update ingredient with safe number handling
+  const updateIngredient = (index: number, field: keyof Omit<EditableIngredient, 'name'>, value: string) => {
+    try {
+      // Allow empty string for better UX while typing
+      if (value === '' || value === '.') {
+        const newEditableAnalysis = { ...editableAnalysis };
+        if (newEditableAnalysis.ingredients[index]) {
+          newEditableAnalysis.ingredients[index][field] = value;
+          setEditableAnalysis(newEditableAnalysis);
+        }
+        return;
+      }
+
+      // Parse float and handle invalid inputs
+      const newValue = parseFloat(value);
+      if (isNaN(newValue)) return;
+
+      const newEditableAnalysis = { ...editableAnalysis };
+      if (!newEditableAnalysis.ingredients[index]) return;
+
+      newEditableAnalysis.ingredients[index][field] = value;
+      setEditableAnalysis(newEditableAnalysis);
+
+      // Update the actual analysis with numbers
+      if (!analysis) return;
+      const newAnalysis: FoodAnalysis = {
+        ingredients: [...analysis.ingredients],
+        total: { ...analysis.total }
+      };
+      if (!newAnalysis.ingredients[index]) return;
+
+      newAnalysis.ingredients[index][field] = newValue;
+
+      // Safely recalculate totals using the helper
+      const totals = newAnalysis.ingredients.reduce(
+        (acc, curr) => ({
+          calories: (acc.calories || 0) + (curr.calories || 0),
+          protein: (acc.protein || 0) + (curr.protein || 0),
+          carbs: (acc.carbs || 0) + (curr.carbs || 0),
+          fat: (acc.fat || 0) + (curr.fat || 0)
+        }),
+        { calories: 0, protein: 0, carbs: 0, fat: 0 }
+      );
+
+      newAnalysis.total = {
+        calories: Number(formatNumber(totals.calories)),
+        protein: Number(formatNumber(totals.protein)),
+        carbs: Number(formatNumber(totals.carbs)),
+        fat: Number(formatNumber(totals.fat))
+      };
+
+      setAnalysis(newAnalysis);
+    } catch (err) {
+      console.error('Error updating ingredient:', err);
+      setError('Failed to update values');
+    }
+  };
+
+  // Show loading state
+  if (isLoading) {
+    return (
+      <Card style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.title}>Food Analysis</Text>
+        </View>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#2f95dc" />
+          <Text style={styles.loadingText}>Loading analysis...</Text>
+        </View>
+      </Card>
+    );
+  }
+
+  // Show error state
+  if (error || !analysis) {
+    return (
+      <Card style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.title}>Food Analysis</Text>
+        </View>
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>{error || 'No analysis data available'}</Text>
+        </View>
+      </Card>
+    );
+  }
 
   const handleEdit = () => {
     setIsEditing(true);
@@ -63,7 +220,7 @@ export default function FoodAnalysisCard({ analysis: initialAnalysis, imagePath,
 
     setIsSaving(true);
     try {
-      const { error } = await supabase
+      const { error: saveError } = await supabase
         .from('food_logs')
         .upsert({
           user_id: session.user.id,
@@ -73,13 +230,13 @@ export default function FoodAnalysisCard({ analysis: initialAnalysis, imagePath,
           updated_at: new Date().toISOString(),
         });
 
-      if (error) throw error;
+      if (saveError) throw saveError;
 
       setIsEditing(false);
       onSave?.();
       Alert.alert('Success', 'Your adjustments have been saved');
-    } catch (error) {
-      console.error('Error saving adjustments:', error);
+    } catch (err) {
+      console.error('Error saving adjustments:', err);
       Alert.alert('Error', 'Failed to save adjustments');
     } finally {
       setIsSaving(false);
@@ -87,43 +244,28 @@ export default function FoodAnalysisCard({ analysis: initialAnalysis, imagePath,
   };
 
   const handleCancel = () => {
-    setAnalysis(initialAnalysis);
-    setIsEditing(false);
-  };
+    try {
+      // Reset to initial values with validation
+      if (!initialAnalysis?.ingredients) {
+        throw new Error('Invalid initial analysis data');
+      }
 
-  const updateIngredient = (index: number, field: keyof Omit<EditableIngredient, 'name'>, value: string) => {
-    // Allow empty string for better UX while typing
-    if (value === '' || value === '.') {
-      const newEditableAnalysis = { ...editableAnalysis };
-      newEditableAnalysis.ingredients[index][field] = value;
-      setEditableAnalysis(newEditableAnalysis);
-      return;
+      setAnalysis(initialAnalysis);
+      setEditableAnalysis({
+        ingredients: initialAnalysis.ingredients.map(ing => ({
+          name: ing.name || 'Unknown Item',
+          calories: (ing.calories || 0).toString(),
+          protein: (ing.protein || 0).toString(),
+          carbs: (ing.carbs || 0).toString(),
+          fat: (ing.fat || 0).toString()
+        }))
+      });
+      setIsEditing(false);
+      setError(null);
+    } catch (err) {
+      console.error('Error resetting analysis:', err);
+      setError('Failed to reset analysis data');
     }
-
-    // Parse float and handle invalid inputs
-    const newValue = parseFloat(value);
-    if (isNaN(newValue)) return;
-
-    const newEditableAnalysis = { ...editableAnalysis };
-    newEditableAnalysis.ingredients[index][field] = value;
-    setEditableAnalysis(newEditableAnalysis);
-
-    // Update the actual analysis with numbers
-    const newAnalysis = { ...analysis };
-    newAnalysis.ingredients[index][field] = newValue;
-
-    // Recalculate totals
-    newAnalysis.total = newAnalysis.ingredients.reduce(
-      (acc, curr) => ({
-        calories: Number((acc.calories + curr.calories).toFixed(1)),
-        protein: Number((acc.protein + curr.protein).toFixed(1)),
-        carbs: Number((acc.carbs + curr.carbs).toFixed(1)),
-        fat: Number((acc.fat + curr.fat).toFixed(1)),
-      }),
-      { calories: 0, protein: 0, carbs: 0, fat: 0 }
-    );
-
-    setAnalysis(newAnalysis);
   };
 
   return (
@@ -330,4 +472,20 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#2f95dc',
   },
+  loadingContainer: {
+    padding: 20,
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 10,
+    color: '#666',
+  },
+  errorContainer: {
+    padding: 20,
+    alignItems: 'center',
+  },
+  errorText: {
+    color: '#ff3b30',
+    textAlign: 'center',
+  }
 }); 
