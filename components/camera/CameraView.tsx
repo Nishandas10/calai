@@ -106,7 +106,7 @@ export function CameraView({ isVisible, onClose }: CameraViewProps) {
       scanLineAnim.stopAnimation();
     };
   }, [isScanning]);
-
+    
   if (!isVisible) {
     return null;
   }
@@ -124,7 +124,6 @@ export function CameraView({ isVisible, onClose }: CameraViewProps) {
   const toggleFlash = () => {
     setFlashMode(current => current === 'off' ? 'on' : 'off');
   };
-
   const handleCapture = async () => {
     if (!cameraRef.current || isCapturing) return;
 
