@@ -60,7 +60,7 @@ function useProtectedRoute(session: Session | null) {
         } else {
           if (inTabsGroup || inAuthGroup) {
             console.log('Onboarding not completed, redirecting to onboarding');
-            router.replace('/(onboarding)/bmi-calculator');
+            router.replace('/(onboarding)/macro-goals');
           }
         }
       } catch (error) {
