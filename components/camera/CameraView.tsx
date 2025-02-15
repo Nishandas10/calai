@@ -10,8 +10,8 @@ import * as ImageManipulator from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
 import { supabase } from '@/lib/supabase';
-import FoodAnalysisCard from '../food/FoodAnalysisCard';
 import type { FlashMode } from 'expo-camera';
+import { router } from 'expo-router';
 
 interface CameraViewProps {
   isVisible: boolean;
@@ -170,11 +170,22 @@ export function CameraView({ isVisible, onClose }: CameraViewProps) {
       // Get the relative path from the full URL
       const url = new URL(imageUrl);
       const path = url.pathname.split('/').slice(-2).join('/');
+      
+      // Ensure we have a valid path
+      if (!path) {
+        throw new Error('Failed to get valid image path');
+      }
+      
       setImagePath(path);
 
       // Analyze the food image
       const foodAnalysis = await analyzeFoodImage(path);
       setAnalysis(foodAnalysis);
+
+      // Note: We don't need to save to food_logs here as it's already done in the Edge Function
+      
+      // Refresh the index page after successful analysis
+      router.replace('/(tabs)');
 
     } catch (error) {
       console.error('Error processing photo:', error);
@@ -272,8 +283,12 @@ export function CameraView({ isVisible, onClose }: CameraViewProps) {
           }
         } catch (imageError) {
           console.error('Error storing product image:', imageError);
-          // Continue with the process even if image storage fails
+          // If we fail to store the image, we'll use a default placeholder image
+          storedImagePath = 'default/placeholder-food.jpg';
         }
+      } else {
+        // If no image URL is available, use a default placeholder image
+        storedImagePath = 'default/placeholder-food.jpg';
       }
       
       const savedProduct = await saveProductToDatabase(productData);
@@ -301,15 +316,16 @@ export function CameraView({ isVisible, onClose }: CameraViewProps) {
       };
       
       setAnalysis(analysis);
-      // Use the stored image path if available, otherwise fallback to the original URL
-      const finalImagePath = storedImagePath || productData.product.image_url;
+      
+      // Ensure we have a valid image path before saving to food_logs
+      const finalImagePath = storedImagePath || 'default/placeholder-food.jpg';
       setImagePath(finalImagePath);
       setPreviewImage(storedImagePath 
         ? supabase.storage.from('food-images').getPublicUrl(storedImagePath).data.publicUrl 
         : productData.product.image_url
       );
       
-      // Save to food_logs table
+      // Save to food_logs table with guaranteed image_path
       try {
         const { error: logError } = await supabase
           .from('food_logs')
@@ -321,10 +337,18 @@ export function CameraView({ isVisible, onClose }: CameraViewProps) {
             created_at: new Date().toISOString()
           });
 
-        if (logError) throw logError;
+        if (logError) {
+          console.error('Error saving to food logs:', logError);
+          throw logError;
+        }
+        
+        // Refresh the index page and close camera after successful save
+        router.replace('/(tabs)');
+        handleDone();
+        
       } catch (logError) {
         console.error('Error saving to food logs:', logError);
-        // Continue even if logging fails
+        Alert.alert('Error', 'Failed to save food log. Please try again.');
       }
       
     } catch (error) {
@@ -394,49 +418,51 @@ export function CameraView({ isVisible, onClose }: CameraViewProps) {
     >
       <View style={styles.container}>
         {previewImage ? (
-          // Preview Screen with improved UI
-          <View style={styles.previewContainer}>
-            <Image source={{ uri: previewImage }} style={styles.previewImage} />
-            
-            {analysis && imagePath ? (
-              // Analysis Results
-              <>
-                <FoodAnalysisCard 
-                  analysis={analysis} 
-                  imagePath={imagePath} 
-                  onSave={handleDone}
-                />
+          // Preview Screen Overlay
+          <View style={styles.previewOverlayContainer}>
+            <View style={styles.previewContent}>
+              <Image source={{ uri: previewImage }} style={styles.previewImage} />
+              {isScanningBarcode ? (
+                <View style={styles.previewActions}>
+                  <TouchableOpacity
+                    style={[styles.doneButton]}
+                    onPress={handleDone}
+                    disabled={isCapturing}
+                  >
+                    <Ionicons name="checkmark-circle-outline" size={48} color="white" />
+                    <Text style={styles.buttonText}>Done</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : analysis && imagePath ? (
                 <TouchableOpacity
                   style={[styles.doneButton]}
                   onPress={handleDone}
                   disabled={isCapturing}
                 >
-                  <Ionicons name="checkmark-circle" size={24} color="white" />
+                  <Ionicons name="checkmark-circle-outline" size={48} color="white" />
+                  <Text style={styles.buttonText}>Done</Text>
                 </TouchableOpacity>
-              </>
-            ) : (
-              // Improved Accept/Retake UI
-              <View style={styles.previewOverlay}>
-                <View style={styles.previewButtons}>
+              ) : (
+                <View style={styles.previewActions}>
                   <TouchableOpacity
-                    style={[styles.previewButton, styles.retakeButton]}
+                    style={[styles.actionButton, styles.retakeButton]}
                     onPress={handleRetake}
                     disabled={isCapturing}
                   >
-                    <Ionicons name="refresh" size={24} color="white" />
-                    <Text style={styles.buttonText}>Retake</Text>
+                    <Ionicons name="refresh-outline" size={32} color="white" />
+                    <Text style={styles.actionButtonText}>Retake</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
-                    style={[styles.previewButton, styles.acceptButton]}
+                    style={[styles.actionButton, styles.acceptButton]}
                     onPress={handleAccept}
                     disabled={isCapturing}
                   >
-                    <Ionicons name="checkmark" size={24} color="white" />
-                    <Text style={styles.buttonText}>Use Photo</Text>
+                    <Ionicons name="checkmark-outline" size={32} color="white" />
+                    <Text style={styles.actionButtonText}>Accept</Text>
                   </TouchableOpacity>
                 </View>
-              </View>
-            )}
+              )}
+            </View>
           </View>
         ) : (
           // Enhanced Camera Screen
@@ -504,13 +530,34 @@ export function CameraView({ isVisible, onClose }: CameraViewProps) {
                   <Ionicons name="images" size={30} color="white" />
                 </TouchableOpacity>
                 {!isScanningBarcode && (
-                  <TouchableOpacity
-                    style={[styles.captureButton, isCapturing && styles.buttonDisabled]}
-                    onPress={handleCapture}
-                    disabled={isCapturing}
-                  >
-                    <View style={styles.captureButtonInner} />
-                  </TouchableOpacity>
+                  <>
+                    {previewImage ? (
+                      <View style={styles.previewActions}>
+                        <TouchableOpacity
+                          style={[styles.previewActionButton, styles.retakeButton]}
+                          onPress={handleRetake}
+                          disabled={isCapturing}
+                        >
+                          <Ionicons name="refresh" size={24} color="white" />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[styles.previewActionButton, styles.acceptButton]}
+                          onPress={handleAccept}
+                          disabled={isCapturing}
+                        >
+                          <Ionicons name="checkmark" size={24} color="white" />
+                        </TouchableOpacity>
+                      </View>
+                    ) : (
+                      <TouchableOpacity
+                        style={[styles.captureButton, isCapturing && styles.buttonDisabled]}
+                        onPress={handleCapture}
+                        disabled={isCapturing}
+                      >
+                        <View style={styles.captureButtonInner} />
+                      </TouchableOpacity>
+                    )}
+                  </>
                 )}
                 <TouchableOpacity
                   style={[styles.scanButton, isScanningBarcode && styles.scanButtonActive]}
@@ -575,27 +622,47 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-end',
     marginBottom: 20,
   },
-  previewContainer: {
-    flex: 1,
-    backgroundColor: 'black',
-  },
-  previewImage: {
-    height: '50%',
-    resizeMode: 'contain',
-  },
-  previewButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'center',
-    paddingVertical: 20,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-  },
-  previewButton: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+  previewOverlayContainer: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.85)',
     justifyContent: 'center',
     alignItems: 'center',
+    padding: 20,
+  },
+  previewContent: {
+    width: '100%',
+    maxHeight: '90%',
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 20,
+    overflow: 'hidden',
+    padding: 12,
+  },
+  previewImage: {
+    width: '100%',
+    height: undefined,
+    aspectRatio: 3/4,
+    borderRadius: 15,
+  },
+  previewActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-evenly',
+    alignItems: 'center',
+    paddingVertical: 16,
+  },
+  actionButton: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
   },
   retakeButton: {
     backgroundColor: '#FF3B30',
@@ -603,16 +670,28 @@ const styles = StyleSheet.create({
   acceptButton: {
     backgroundColor: '#34C759',
   },
+  actionButtonText: {
+    color: 'white',
+    fontSize: 13,
+    fontWeight: 'bold',
+    marginTop: 4,
+  },
   doneButton: {
-    position: 'absolute',
-    bottom: 20,
-    right: 20,
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 120,
+    height: 120,
+    borderRadius: 60,
     backgroundColor: '#34C759',
     justifyContent: 'center',
     alignItems: 'center',
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    marginTop: 20,
   },
   scannerOverlay: {
     flex: 1,
@@ -679,12 +758,14 @@ const styles = StyleSheet.create({
   previewOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.7)',
-    justifyContent: 'flex-end',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   buttonText: {
     color: 'white',
-    marginTop: 4,
-    fontSize: 12,
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginTop: 8,
   },
   barcodeScannerFrame: {
     width: 280,
@@ -710,5 +791,13 @@ const styles = StyleSheet.create({
   },
   scanButtonActive: {
     backgroundColor: '#2f95dc',
+  },
+  previewActionButton: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
   },
 }); 
