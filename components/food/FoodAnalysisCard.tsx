@@ -10,6 +10,7 @@ interface Ingredient {
   protein: number;
   carbs: number;
   fat: number;
+  fiber: number;
 }
 
 interface EditableIngredient {
@@ -18,6 +19,7 @@ interface EditableIngredient {
   protein: number | string;
   carbs: number | string;
   fat: number | string;
+  fiber: number | string;
 }
 
 interface FoodAnalysis {
@@ -27,6 +29,7 @@ interface FoodAnalysis {
     protein: number;
     carbs: number;
     fat: number;
+    fiber: number;
   };
 }
 
@@ -63,14 +66,16 @@ export default function FoodAnalysisCard({ analysis: initialAnalysis, imagePath,
           calories: typeof ing.calories === 'number' ? ing.calories : 0,
           protein: typeof ing.protein === 'number' ? ing.protein : 0,
           carbs: typeof ing.carbs === 'number' ? ing.carbs : 0,
-          fat: typeof ing.fat === 'number' ? ing.fat : 0
+          fat: typeof ing.fat === 'number' ? ing.fat : 0,
+          fiber: typeof ing.fiber === 'number' ? ing.fiber : 0
         }));
 
         const safeTotal: FoodAnalysis['total'] = {
           calories: typeof initialAnalysis.total.calories === 'number' ? initialAnalysis.total.calories : 0,
           protein: typeof initialAnalysis.total.protein === 'number' ? initialAnalysis.total.protein : 0,
           carbs: typeof initialAnalysis.total.carbs === 'number' ? initialAnalysis.total.carbs : 0,
-          fat: typeof initialAnalysis.total.fat === 'number' ? initialAnalysis.total.fat : 0
+          fat: typeof initialAnalysis.total.fat === 'number' ? initialAnalysis.total.fat : 0,
+          fiber: typeof initialAnalysis.total.fiber === 'number' ? initialAnalysis.total.fiber : 0
         };
 
         const safeAnalysis: FoodAnalysis = {
@@ -89,7 +94,8 @@ export default function FoodAnalysisCard({ analysis: initialAnalysis, imagePath,
               calories: ing.calories.toString(),
               protein: ing.protein.toString(),
               carbs: ing.carbs.toString(),
-              fat: ing.fat.toString()
+              fat: ing.fat.toString(),
+              fiber: ing.fiber.toString()
             }))
           });
 
@@ -160,16 +166,18 @@ export default function FoodAnalysisCard({ analysis: initialAnalysis, imagePath,
           calories: (acc.calories || 0) + (curr.calories || 0),
           protein: (acc.protein || 0) + (curr.protein || 0),
           carbs: (acc.carbs || 0) + (curr.carbs || 0),
-          fat: (acc.fat || 0) + (curr.fat || 0)
+          fat: (acc.fat || 0) + (curr.fat || 0),
+          fiber: (acc.fiber || 0) + (curr.fiber || 0)
         }),
-        { calories: 0, protein: 0, carbs: 0, fat: 0 }
+        { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 }
       );
 
       newAnalysis.total = {
         calories: Number(formatNumber(totals.calories)),
         protein: Number(formatNumber(totals.protein)),
         carbs: Number(formatNumber(totals.carbs)),
-        fat: Number(formatNumber(totals.fat))
+        fat: Number(formatNumber(totals.fat)),
+        fiber: Number(formatNumber(totals.fiber))
       };
 
       setAnalysis(newAnalysis);
@@ -257,7 +265,8 @@ export default function FoodAnalysisCard({ analysis: initialAnalysis, imagePath,
           calories: (ing.calories || 0).toString(),
           protein: (ing.protein || 0).toString(),
           carbs: (ing.carbs || 0).toString(),
-          fat: (ing.fat || 0).toString()
+          fat: (ing.fat || 0).toString(),
+          fiber: (ing.fiber || 0).toString()
         }))
       });
       setIsEditing(false);
@@ -339,6 +348,16 @@ export default function FoodAnalysisCard({ analysis: initialAnalysis, imagePath,
                       maxLength={5}
                     />
                   </View>
+                  <View style={styles.macroInput}>
+                    <Text style={styles.macroLabel}>Fiber (g):</Text>
+                    <TextInput
+                      style={styles.input}
+                      value={editableAnalysis.ingredients[index].fiber.toString()}
+                      onChangeText={(value) => updateIngredient(index, 'fiber', value)}
+                      keyboardType="decimal-pad"
+                      maxLength={5}
+                    />
+                  </View>
                 </>
               ) : (
                 <>
@@ -346,6 +365,7 @@ export default function FoodAnalysisCard({ analysis: initialAnalysis, imagePath,
                   <Text style={styles.macroText}>{ingredient.protein.toFixed(1)}g protein</Text>
                   <Text style={styles.macroText}>{ingredient.carbs.toFixed(1)}g carbs</Text>
                   <Text style={styles.macroText}>{ingredient.fat.toFixed(1)}g fat</Text>
+                  <Text style={styles.macroText}>{ingredient.fiber.toFixed(1)}g fiber</Text>
                 </>
               )}
             </View>
@@ -360,6 +380,7 @@ export default function FoodAnalysisCard({ analysis: initialAnalysis, imagePath,
           <Text style={styles.totalText}>{analysis.total.protein.toFixed(1)}g protein</Text>
           <Text style={styles.totalText}>{analysis.total.carbs.toFixed(1)}g carbs</Text>
           <Text style={styles.totalText}>{analysis.total.fat.toFixed(1)}g fat</Text>
+          <Text style={styles.totalText}>{analysis.total.fiber.toFixed(1)}g fiber</Text>
         </View>
       </View>
     </Card>

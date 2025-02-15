@@ -11,11 +11,20 @@ CREATE TABLE IF NOT EXISTS public.user_profiles (
 );
 
 -- Add foreign key after table creation
-DO $$ BEGIN
-    ALTER TABLE public.user_profiles 
-    ADD CONSTRAINT user_profiles_id_fkey 
-    FOREIGN KEY (id) 
-    REFERENCES auth.users(id);
+DO $$ 
+BEGIN
+    -- Check if the constraint doesn't exist before creating it
+    IF NOT EXISTS (
+        SELECT 1 
+        FROM information_schema.table_constraints 
+        WHERE constraint_name = 'user_profiles_id_fkey'
+        AND table_name = 'user_profiles'
+    ) THEN
+        ALTER TABLE public.user_profiles 
+        ADD CONSTRAINT user_profiles_id_fkey 
+        FOREIGN KEY (id) 
+        REFERENCES auth.users(id);
+    END IF;
 EXCEPTION
     WHEN undefined_table THEN 
         NULL;
@@ -63,6 +72,7 @@ CREATE TABLE IF NOT EXISTS public.user_macro_goals (
     protein NUMERIC NOT NULL,
     carbs NUMERIC NOT NULL,
     fat NUMERIC NOT NULL,
+    fiber NUMERIC NOT NULL,
     use_auto_macros BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
@@ -76,10 +86,12 @@ CREATE TABLE IF NOT EXISTS public.daily_nutrition_targets (
     target_protein INTEGER NOT NULL,
     target_carbs INTEGER NOT NULL,
     target_fat INTEGER NOT NULL,
+    target_fiber INTEGER NOT NULL,
     consumed_calories INTEGER DEFAULT 0,
     consumed_protein INTEGER DEFAULT 0,
     consumed_carbs INTEGER DEFAULT 0,
     consumed_fat INTEGER DEFAULT 0,
+    consumed_fiber INTEGER DEFAULT 0,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(user_id, date)

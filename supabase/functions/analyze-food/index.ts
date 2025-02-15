@@ -19,12 +19,14 @@ interface FoodAnalysis {
     protein: number;
     carbs: number;
     fat: number;
+    fiber: number;
   }[];
   total: {
     calories: number;
     protein: number;
     carbs: number;
     fat: number;
+    fiber: number;
   };
 }
 
@@ -139,7 +141,7 @@ serve(async (req: Request) => {
               {
                 type: "text",
                 text:
-                  "Analyze this food image and return a JSON object with the following format: {ingredients: [{name: string, calories: number, protein: number, carbs: number, fat: number}], total: {calories: number, protein: number, carbs: number, fat: number}}. Be precise with the measurements and ensure the totals are accurate sums of the ingredients.",
+                  "Analyze this food image and return a JSON object with the following format: {ingredients: [{name: string, calories: number, protein: number, carbs: number, fat: number, fiber: number}], total: {calories: number, protein: number, carbs: number, fat: number, fiber: number}}. Be precise with the measurements, estimate fiber content based on food type, and ensure the totals are accurate sums of the ingredients. All values should be per 100g serving.",
               },
               {
                 type: "image_url",

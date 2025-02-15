@@ -288,13 +288,15 @@ export function CameraView({ isVisible, onClose }: CameraViewProps) {
           calories: Math.round(productData.product.nutriments['energy-kcal_100g'] || 0),
           protein: Number((productData.product.nutriments.proteins_100g || 0).toFixed(1)),
           carbs: Number((productData.product.nutriments.carbohydrates_100g || 0).toFixed(1)),
-          fat: Number((productData.product.nutriments.fat_100g || 0).toFixed(1))
+          fat: Number((productData.product.nutriments.fat_100g || 0).toFixed(1)),
+          fiber: Number((productData.product.nutriments.fiber_100g || 0).toFixed(1))
         }],
         total: {
           calories: Math.round(productData.product.nutriments['energy-kcal_100g'] || 0),
           protein: Number((productData.product.nutriments.proteins_100g || 0).toFixed(1)),
           carbs: Number((productData.product.nutriments.carbohydrates_100g || 0).toFixed(1)),
-          fat: Number((productData.product.nutriments.fat_100g || 0).toFixed(1))
+          fat: Number((productData.product.nutriments.fat_100g || 0).toFixed(1)),
+          fiber: Number((productData.product.nutriments.fiber_100g || 0).toFixed(1))
         }
       };
       
