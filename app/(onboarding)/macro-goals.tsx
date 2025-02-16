@@ -80,7 +80,11 @@ export default function MacroGoalsScreen() {
   };
 
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView 
+      style={styles.container}
+      contentContainerStyle={styles.scrollContent}
+      showsVerticalScrollIndicator={false}
+    >
       <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
         <Ionicons name="arrow-back" size={24} color="black" />
       </TouchableOpacity>
@@ -103,11 +107,6 @@ export default function MacroGoalsScreen() {
             onPress={() => handlePresetSelect(index)}
           >
             <View style={styles.presetInfo}>
-              {selectedPreset === index && (
-                <View style={styles.checkmark}>
-                  <Ionicons name="checkmark-circle" size={24} color="black" />
-                </View>
-              )}
               <Text style={styles.presetName}>{preset.name}</Text>
               <Text style={styles.presetRatio}>{preset.carbs} : {preset.protein} : {preset.fat}</Text>
               <Text style={styles.presetDescription}>{preset.description}</Text>
@@ -155,24 +154,28 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fff',
-    padding: 20,
+  },
+  scrollContent: {
+    flex: 1,
+    padding: 16,
+    justifyContent: 'center',
   },
   backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: '#f5f5f5',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 16,
   },
   header: {
-    marginBottom: 30,
+    marginBottom: 20,
   },
   title: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 20,
+    marginBottom: 16,
     color: '#000',
   },
   progressBar: {
@@ -187,16 +190,16 @@ const styles = StyleSheet.create({
     borderRadius: 2,
   },
   presetList: {
-    gap: 16,
-    marginBottom: 24,
+    gap: 12,
+    marginBottom: 20,
   },
   presetCard: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 20,
+    padding: 16,
     backgroundColor: '#f8f8f8',
-    borderRadius: 16,
+    borderRadius: 12,
     borderWidth: 2,
     borderColor: 'transparent',
   },
@@ -206,36 +209,32 @@ const styles = StyleSheet.create({
   },
   presetInfo: {
     flex: 1,
-  },
-  checkmark: {
-    position: 'absolute',
-    top: -8,
-    left: -8,
+    marginRight: 12,
   },
   presetName: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 'bold',
     marginBottom: 4,
     color: '#000',
   },
   presetRatio: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#666',
-    marginBottom: 4,
+    marginBottom: 2,
   },
   presetDescription: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#999',
   },
   macroCircles: {
     flexDirection: 'row',
-    gap: -8,
+    gap: -6,
     alignItems: 'center',
   },
   circle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
   },
   carbsCircle: {
     backgroundColor: '#FFD700',
@@ -252,33 +251,33 @@ const styles = StyleSheet.create({
   legend: {
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: 20,
-    marginBottom: 24,
+    gap: 16,
+    marginBottom: 20,
   },
   legendItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
   },
   legendDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
   },
   legendText: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#666',
   },
   note: {
     textAlign: 'center',
     color: '#999',
-    fontSize: 14,
-    marginBottom: 30,
+    fontSize: 12,
+    marginBottom: 24,
   },
   nextButton: {
     backgroundColor: '#000',
-    paddingVertical: 16,
-    borderRadius: 30,
-    marginBottom: 20,
+    paddingVertical: 14,
+    borderRadius: 25,
+    marginBottom: 16,
   }
 }); 

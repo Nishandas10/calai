@@ -6,6 +6,9 @@ type DietStyle = 'Keto' | 'Low-carb' | 'Mediterranean' | 'None';
 type Goal = 'Lose weight' | 'Maintain' | 'Gain muscle' | 'Healthy lifestyle';
 
 interface OnboardingData {
+  // User Info
+  name: string | null;
+  
   // Goals
   primaryGoal: Goal | null;
   targetWeight: number | null;
@@ -26,6 +29,7 @@ interface OnboardingData {
 
 interface OnboardingContextType {
   data: OnboardingData;
+  setName: (name: string) => void;
   setGoals: (goal: Goal, targetWeight: number | null, pace: number) => void;
   setDietaryPreferences: (preferences: DietaryPreference[], style: DietStyle) => void;
   setMacros: (protein: number, carbs: number, fat: number, useAuto: boolean) => void;
@@ -34,6 +38,7 @@ interface OnboardingContextType {
 }
 
 const defaultOnboardingData: OnboardingData = {
+  name: null,
   primaryGoal: null,
   targetWeight: null,
   weeklyPace: null,
@@ -51,6 +56,13 @@ const OnboardingContext = createContext<OnboardingContextType | undefined>(undef
 
 export function OnboardingProvider({ children }: { children: React.ReactNode }) {
   const [data, setData] = useState<OnboardingData>(defaultOnboardingData);
+
+  const setName = (name: string) => {
+    setData(prev => ({
+      ...prev,
+      name,
+    }));
+  };
 
   const setGoals = (goal: Goal, targetWeight: number | null, pace: number) => {
     setData(prev => ({
@@ -141,6 +153,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
     <OnboardingContext.Provider
       value={{
         data,
+        setName,
         setGoals,
         setDietaryPreferences,
         setMacros,
