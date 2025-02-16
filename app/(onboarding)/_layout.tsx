@@ -6,6 +6,8 @@ export default function OnboardingLayout() {
   return (
     <OnboardingProvider>
       <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="name" />
+        <Stack.Screen name="gender" />
         <Stack.Screen name="macro-goals" />
         <Stack.Screen name="goals" />
         <Stack.Screen name="dietary-preferences" />

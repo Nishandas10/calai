@@ -12,7 +12,7 @@ export default function NameScreen() {
   const handleNext = () => {
     if (value.trim()) {
       setName(value.trim());
-      router.push('/(onboarding)/goals');
+      router.push('/(onboarding)/gender');
     }
   };
 

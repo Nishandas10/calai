@@ -8,6 +8,7 @@ type Goal = 'Lose weight' | 'Maintain' | 'Gain muscle' | 'Healthy lifestyle';
 interface OnboardingData {
   // User Info
   name: string | null;
+  gender: 'male' | 'female' | 'prefer_not_to_say' | null;
   
   // Goals
   primaryGoal: Goal | null;
@@ -30,6 +31,7 @@ interface OnboardingData {
 interface OnboardingContextType {
   data: OnboardingData;
   setName: (name: string) => void;
+  setGender: (gender: 'male' | 'female' | 'prefer_not_to_say') => void;
   setGoals: (goal: Goal, targetWeight: number | null, pace: number) => void;
   setDietaryPreferences: (preferences: DietaryPreference[], style: DietStyle) => void;
   setMacros: (protein: number, carbs: number, fat: number, useAuto: boolean) => void;
@@ -39,6 +41,7 @@ interface OnboardingContextType {
 
 const defaultOnboardingData: OnboardingData = {
   name: null,
+  gender: null,
   primaryGoal: null,
   targetWeight: null,
   weeklyPace: null,
@@ -61,6 +64,13 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
     setData(prev => ({
       ...prev,
       name,
+    }));
+  };
+
+  const setGender = (gender: 'male' | 'female' | 'prefer_not_to_say') => {
+    setData(prev => ({
+      ...prev,
+      gender,
     }));
   };
 
@@ -154,6 +164,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
       value={{
         data,
         setName,
+        setGender,
         setGoals,
         setDietaryPreferences,
         setMacros,
