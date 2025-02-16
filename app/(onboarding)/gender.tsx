@@ -12,7 +12,7 @@ export default function GenderScreen() {
   const handleNext = () => {
     if (selected) {
       setGender(selected);
-      router.push('/(onboarding)/goals');
+      router.push('/(onboarding)/activity');
     }
   };
 
