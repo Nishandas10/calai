@@ -11,6 +11,7 @@ interface OnboardingData {
   gender: 'male' | 'female' | 'prefer_not_to_say' | null;
   activityLevel: number | null;
   height: number | null;
+  weight: number | null;
   
   // Goals
   primaryGoal: Goal | null;
@@ -36,6 +37,7 @@ interface OnboardingContextType {
   setGender: (gender: 'male' | 'female' | 'prefer_not_to_say') => void;
   setActivityLevel: (level: number) => void;
   setHeight: (height: number) => void;
+  setWeight: (weight: number) => void;
   setGoals: (goal: Goal, targetWeight: number | null, pace: number) => void;
   setDietaryPreferences: (preferences: DietaryPreference[], style: DietStyle) => void;
   setMacros: (protein: number, carbs: number, fat: number, useAuto: boolean) => void;
@@ -48,6 +50,7 @@ const defaultOnboardingData: OnboardingData = {
   gender: null,
   activityLevel: null,
   height: null,
+  weight: null,
   primaryGoal: null,
   targetWeight: null,
   weeklyPace: null,
@@ -86,6 +89,13 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
 
   const setHeight = (height: number) => {
     setData(prev => ({ ...prev, height }));
+  };
+
+  const setWeight = (weight: number) => {
+    setData(prev => ({
+      ...prev,
+      weight,
+    }));
   };
 
   const setGoals = (goal: Goal, targetWeight: number | null, pace: number) => {
@@ -181,6 +191,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
         setGender,
         setActivityLevel,
         setHeight,
+        setWeight,
         setGoals,
         setDietaryPreferences,
         setMacros,
