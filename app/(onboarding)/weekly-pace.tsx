@@ -86,9 +86,9 @@ export default function WeeklyPaceScreen() {
 
           <View style={styles.sliderContainer}>
             <View style={styles.animalIcons}>
-              <Text style={styles.animalIcon}>🦥</Text>
-              <Text style={styles.animalIcon}>🐰</Text>
-              <Text style={styles.animalIcon}>🐆</Text>
+              <Text style={styles.animalIcon}>🧍</Text>
+              <Text style={styles.animalIcon}>🚶</Text>
+              <Text style={styles.animalIcon}>🏃</Text>
             </View>
 
             <View style={styles.sliderTrack}>
