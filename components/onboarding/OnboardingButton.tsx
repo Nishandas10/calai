@@ -33,7 +33,7 @@ export function OnboardingButton({
 
 const styles = StyleSheet.create({
   button: {
-    backgroundColor: theme.colors.primary,
+    backgroundColor: '#000',
     height: 56,
     borderRadius: 28,
     justifyContent: 'center',

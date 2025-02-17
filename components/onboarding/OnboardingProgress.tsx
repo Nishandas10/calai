@@ -29,7 +29,7 @@ const styles = StyleSheet.create({
   },
   progress: {
     height: '100%',
-    backgroundColor: theme.colors.primary,
+    backgroundColor: '#000',
     borderRadius: 2,
   },
 }); 

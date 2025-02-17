@@ -9,6 +9,7 @@ interface OnboardingData {
   // User Info
   name: string | null;
   gender: 'male' | 'female' | 'prefer_not_to_say' | null;
+  birthday: Date | null;
   activityLevel: number | null;
   height: number | null;
   weight: number | null;
@@ -35,6 +36,7 @@ interface OnboardingContextType {
   data: OnboardingData;
   setName: (name: string) => void;
   setGender: (gender: 'male' | 'female' | 'prefer_not_to_say') => void;
+  setBirthday: (date: Date) => void;
   setActivityLevel: (level: number) => void;
   setHeight: (height: number) => void;
   setWeight: (weight: number) => void;
@@ -48,6 +50,7 @@ interface OnboardingContextType {
 const defaultOnboardingData: OnboardingData = {
   name: null,
   gender: null,
+  birthday: null,
   activityLevel: null,
   height: null,
   weight: null,
@@ -80,6 +83,13 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
     setData(prev => ({
       ...prev,
       gender,
+    }));
+  };
+
+  const setBirthday = (date: Date) => {
+    setData(prev => ({
+      ...prev,
+      birthday: date,
     }));
   };
 
@@ -189,6 +199,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
         data,
         setName,
         setGender,
+        setBirthday,
         setActivityLevel,
         setHeight,
         setWeight,
