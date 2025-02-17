@@ -54,7 +54,7 @@ export default function WeeklyPaceScreen() {
 
   const handleNext = () => {
     setGoals('Lose weight', null, selectedPace);
-    router.push('/(onboarding)/comparison');
+    router.push('/(onboarding)/weekly-pace-info');
   };
 
   return (

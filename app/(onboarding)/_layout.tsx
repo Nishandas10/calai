@@ -13,6 +13,8 @@ export default function OnboardingLayout() {
         <Stack.Screen name="weight" />
         <Stack.Screen name="target-weight" />
         <Stack.Screen name="weekly-pace" />
+        <Stack.Screen name="weekly-pace-info" />
+        <Stack.Screen name="benefits" />
         <Stack.Screen name="comparison" />
         <Stack.Screen name="goals" />
         <Stack.Screen name="macro-goals" />
