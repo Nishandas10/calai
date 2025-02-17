@@ -1,174 +1,167 @@
 import React, { useState } from 'react';
-import { View, StyleSheet } from 'react-native';
-import { Text, Button, TextInput } from 'react-native-paper';
-import { useOnboarding } from '../../hooks/useOnboarding';
-import { HealthMetrics, UserGoals, DietaryPreferences, MacroGoals } from '../../lib/api/onboarding';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { router } from 'expo-router';
+import { useOnboarding } from '@/context/onboarding';
+import { OnboardingHeader } from '@/components/onboarding/OnboardingHeader';
+import { OnboardingProgress } from '@/components/onboarding/OnboardingProgress';
+import { OnboardingButton } from '@/components/onboarding/OnboardingButton';
+import { Ionicons } from '@expo/vector-icons';
+
+const GOALS = [
+  {
+    id: 'lose_weight',
+    title: 'Lose Weight',
+    icon: '🔥',
+  },
+  {
+    id: 'gain_muscle',
+    title: 'Gain Muscle',
+    icon: '💪',
+  },
+  {
+    id: 'maintain',
+    title: 'Maintain Weight',
+    icon: '⚖️',
+  },
+  {
+    id: 'boost_energy',
+    title: 'Boost Energy',
+    icon: '⚡',
+  },
+  {
+    id: 'improve_nutrition',
+    title: 'Improve Nutrition',
+    icon: '🥗',
+  },
+  {
+    id: 'gain_weight',
+    title: 'Gain Weight',
+    icon: '🎯',
+  },
+] as const;
+
+type GoalType = typeof GOALS[number]['id'];
 
 export default function GoalsScreen() {
-  const { handleOnboardingSubmit, isLoading, error } = useOnboarding();
+  const { setGoals } = useOnboarding();
+  const [selectedGoals, setSelectedGoals] = useState<GoalType[]>([]);
 
-  // Health Metrics Form
-  const [healthMetrics, setHealthMetrics] = useState<HealthMetrics>({
-    weight: 0,
-    height: 0,
-    age: 0,
-    gender: '',
-    activity_level: ''
-  });
-
-  // Goals Form
-  const [goals, setGoals] = useState<UserGoals>({
-    primary_goal: '',
-    target_weight: undefined,
-    weekly_pace: 0.5
-  });
-
-  // Dietary Preferences Form
-  const [dietaryPreferences, setDietaryPreferences] = useState<DietaryPreferences>({
-    is_vegetarian: false,
-    is_vegan: false,
-    is_gluten_free: false,
-    is_dairy_free: false,
-    diet_style: 'None',
-    excluded_ingredients: []
-  });
-
-  // Auto-calculated Macro Goals
-  const [macroGoals, setMacroGoals] = useState<MacroGoals>({
-    protein: 0,
-    carbs: 0,
-    fat: 0,
-    use_auto_macros: true
-  });
-
-  const handleSubmit = async () => {
-    // Calculate macros based on health metrics and goals
-    const calculatedMacros = calculateMacros(healthMetrics, goals);
-    setMacroGoals(prev => ({
-      ...prev,
-      ...calculatedMacros
-    }));
-
-    await handleOnboardingSubmit(
-      healthMetrics,
-      goals,
-      dietaryPreferences,
-      {
-        ...macroGoals,
-        ...calculatedMacros
+  const toggleGoal = (goalId: GoalType) => {
+    setSelectedGoals(prev => {
+      if (prev.includes(goalId)) {
+        return prev.filter(id => id !== goalId);
       }
-    );
+      return [...prev, goalId];
+    });
+  };
+
+  const handleNext = () => {
+    if (selectedGoals.length > 0) {
+      const primaryGoal = selectedGoals[0];
+      setGoals(primaryGoal as any, null, 0);
+      router.push('/(onboarding)/macro-goals');
+    }
   };
 
   return (
     <View style={styles.container}>
-      <Text variant="headlineMedium" style={styles.title}>
-        Let's Get Started
-      </Text>
-
-      {error && (
-        <Text style={styles.error}>{error}</Text>
-      )}
-
-      {/* Health Metrics Section */}
-      <View style={styles.section}>
-        <Text variant="titleMedium">Your Health Metrics</Text>
-        <TextInput
-          label="Weight (kg)"
-          keyboardType="numeric"
-          value={String(healthMetrics.weight || '')}
-          onChangeText={(value: string) => setHealthMetrics(prev => ({
-            ...prev,
-            weight: Number(value)
-          }))}
-          style={styles.input}
+      <View style={styles.header}>
+        <OnboardingHeader 
+          title="What's your main goal with CalAI?" 
+          showBackButton
         />
-        <TextInput
-          label="Height (cm)"
-          keyboardType="numeric"
-          value={String(healthMetrics.height || '')}
-          onChangeText={(value: string) => setHealthMetrics(prev => ({
-            ...prev,
-            height: Number(value)
-          }))}
-          style={styles.input}
-        />
-        <TextInput
-          label="Age"
-          keyboardType="numeric"
-          value={String(healthMetrics.age || '')}
-          onChangeText={(value: string) => setHealthMetrics(prev => ({
-            ...prev,
-            age: Number(value)
-          }))}
-          style={styles.input}
-        />
+        <OnboardingProgress step={4} totalSteps={8} />
       </View>
 
-      {/* Goals Section */}
-      <View style={styles.section}>
-        <Text variant="titleMedium">Your Goals</Text>
-        <TextInput
-          label="Target Weight (kg)"
-          keyboardType="numeric"
-          value={String(goals.target_weight || '')}
-          onChangeText={(value: string) => setGoals(prev => ({
-            ...prev,
-            target_weight: Number(value)
-          }))}
-          style={styles.input}
-        />
+      <View style={styles.contentWrapper}>
+        <View style={styles.content}>
+          {GOALS.map((goal) => (
+            <TouchableOpacity
+              key={goal.id}
+              style={[
+                styles.goalOption,
+                selectedGoals.includes(goal.id) && styles.selectedOption
+              ]}
+              onPress={() => toggleGoal(goal.id)}
+            >
+              <View style={styles.goalContent}>
+                <Text style={styles.goalIcon}>{goal.icon}</Text>
+                <Text style={[
+                  styles.goalText,
+                  selectedGoals.includes(goal.id) && styles.selectedText
+                ]}>
+                  {goal.title}
+                </Text>
+              </View>
+              {selectedGoals.includes(goal.id) && (
+                <Ionicons name="checkmark" size={24} color="#fff" />
+              )}
+            </TouchableOpacity>
+          ))}
+        </View>
       </View>
 
-      <Button
-        mode="contained"
-        onPress={handleSubmit}
-        loading={isLoading}
-        disabled={isLoading}
-        style={styles.button}
-      >
-        Complete Setup
-      </Button>
+      <View style={styles.footer}>
+        <OnboardingButton 
+          label="Continue"
+          onPress={handleNext}
+          disabled={selectedGoals.length === 0}
+        />
+      </View>
     </View>
   );
 }
 
-// Helper function to calculate macros based on user data
-const calculateMacros = (healthMetrics: HealthMetrics, goals: UserGoals): Partial<MacroGoals> => {
-  // This is a simple example - you should implement proper macro calculations
-  const baseProtein = healthMetrics.weight * 2; // 2g per kg of body weight
-  const baseFat = healthMetrics.weight * 1; // 1g per kg of body weight
-  const baseCarbs = healthMetrics.weight * 3; // 3g per kg of body weight
-
-  return {
-    protein: Math.round(baseProtein),
-    fat: Math.round(baseFat),
-    carbs: Math.round(baseCarbs)
-  };
-};
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#fff',
+  },
+  header: {
+    paddingHorizontal: 20,
+    paddingTop: 40,
+  },
+  contentWrapper: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingBottom: 40,
+  },
+  content: {
+    paddingHorizontal: 20,
+    gap: 12,
+  },
+  goalOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     padding: 16,
-    backgroundColor: '#fff'
+    backgroundColor: '#f5f5f5',
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: 'transparent',
   },
-  title: {
-    marginBottom: 24,
-    textAlign: 'center'
+  selectedOption: {
+    backgroundColor: '#000',
+    borderColor: '#000',
   },
-  section: {
-    marginBottom: 24
+  goalContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
   },
-  input: {
-    marginBottom: 12
+  goalIcon: {
+    fontSize: 24,
   },
-  button: {
-    marginTop: 24
+  goalText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#000',
   },
-  error: {
-    color: 'red',
-    marginBottom: 16,
-    textAlign: 'center'
-  }
+  selectedText: {
+    color: '#fff',
+  },
+  footer: {
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+  },
 }); 
