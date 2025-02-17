@@ -6,11 +6,13 @@ export default function OnboardingLayout() {
   return (
     <OnboardingProvider>
       <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="name" options={{ headerShown: false }} />
-        <Stack.Screen name="gender" options={{ headerShown: false }} />
-        <Stack.Screen name="activity" options={{ headerShown: false }} />
+        <Stack.Screen name="name" />
+        <Stack.Screen name="gender" />
+        <Stack.Screen name="activity" />
+        <Stack.Screen name="height" />
+        <Stack.Screen name="comparison" />
+        <Stack.Screen name="goals" />
         <Stack.Screen name="macro-goals" />
-        <Stack.Screen name="goals" options={{ headerShown: false }} />
         <Stack.Screen name="dietary-preferences" />
         <Stack.Screen name="bmi-calculator" />
         <Stack.Screen name="user-goals" />

@@ -52,7 +52,7 @@ export default function ActivityScreen() {
       const selectedLevel = ACTIVITY_LEVELS.find(level => level.id === selected);
       if (selectedLevel) {
         setActivityLevel(selectedLevel.level);
-        router.push('/(onboarding)/macro-goals');
+        router.push('/(onboarding)/comparison');
       }
     }
   };
