@@ -40,10 +40,10 @@ const MACRO_PRESETS = [
 ];
 
 export default function MacroGoalsScreen() {
-  const { data, setMacros } = useOnboarding();
+  const { data, setMacros, calculateMacros } = useOnboarding();
   const { session } = useAuth();
   const [selectedPreset, setSelectedPreset] = useState(0);
-  const [isSaving, setIsSaving] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const handlePresetSelect = (index: number) => {
     setSelectedPreset(index);
@@ -57,25 +57,30 @@ export default function MacroGoalsScreen() {
   };
 
   const handleNext = async () => {
-    setIsSaving(true);
     try {
-      const preset = MACRO_PRESETS[selectedPreset];
-      await UserModel.createMacroGoals({
-        user_id: session?.user.id,
-        protein: preset.protein,
-        carbs: preset.carbs,
-        fat: preset.fat,
-        use_auto_macros: false,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      });
+      setLoading(true);
 
+      // Calculate age from birthday
+      const today = new Date();
+      const birthDate = data.birthday as Date;
+      const age = today.getFullYear() - birthDate.getFullYear();
+
+      // Calculate macros based on user data
+      await calculateMacros(
+        data.weight || 0,
+        data.height || 0,
+        age,
+        data.gender || 'male',
+        data.activityLevel || 1
+      );
+
+      // Navigate to loader screen
       router.push('/(onboarding)/loader');
-    } catch (error: any) {
-      console.error('Error saving macro goals:', error);
-      Alert.alert('Error', error.message || 'Failed to save macro goals');
+    } catch (error) {
+      console.error('Error calculating macros:', error);
+      // You might want to show an error message to the user here
     } finally {
-      setIsSaving(false);
+      setLoading(false);
     }
   };
 
@@ -139,13 +144,15 @@ export default function MacroGoalsScreen() {
         Note: You can fine-tune your macro goals anytime in profile
       </Text>
 
-      <Button 
-        onPress={handleNext}
-        disabled={isSaving}
-        style={styles.nextButton}
-      >
-        {isSaving ? 'Saving...' : 'Next'}
-      </Button>
+      <View style={styles.footer}>
+        <Button 
+          onPress={handleNext}
+          disabled={loading}
+          style={styles.nextButton}
+        >
+          {loading ? 'Calculating...' : 'Next'}
+        </Button>
+      </View>
     </ScrollView>
   );
 }
@@ -273,6 +280,10 @@ const styles = StyleSheet.create({
     color: '#999',
     fontSize: 12,
     marginBottom: 24,
+  },
+  footer: {
+    marginTop: 20,
+    alignItems: 'center',
   },
   nextButton: {
     backgroundColor: '#000',

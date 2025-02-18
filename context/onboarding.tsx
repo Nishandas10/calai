@@ -145,21 +145,34 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
       ? 10 * weight + 6.25 * height - 5 * age + 5
       : 10 * weight + 6.25 * height - 5 * age - 161;
 
-    // Calculate TDEE
-    const tdee = bmr * activityLevel;
+    // Calculate TDEE with activity multiplier
+    const activityMultipliers = {
+      1: 1.2,  // Sedentary
+      2: 1.375,  // Lightly active
+      3: 1.55,  // Moderately active
+      4: 1.725,  // Very active
+      5: 1.9,  // Super active
+    };
+    const tdee = bmr * activityMultipliers[activityLevel as keyof typeof activityMultipliers];
 
     // Calculate macros based on goal
     let protein = 0, carbs = 0, fat = 0;
+    const primaryGoal = data.primaryGoal?.toLowerCase().replace(' ', '_');
 
-    switch (data.primaryGoal) {
-      case 'Lose weight':
+    switch (primaryGoal) {
+      case 'lose_weight':
         protein = weight * 2.2; // 2.2g per kg of body weight
         fat = weight * 0.8; // 0.8g per kg of body weight
         carbs = (tdee - (protein * 4 + fat * 9)) / 4; // Remaining calories from carbs
         break;
-      case 'Gain muscle':
+      case 'gain_muscle':
         protein = weight * 2.4;
         fat = weight * 1;
+        carbs = (tdee - (protein * 4 + fat * 9)) / 4;
+        break;
+      case 'maintain':
+        protein = weight * 2;
+        fat = weight * 0.9;
         carbs = (tdee - (protein * 4 + fat * 9)) / 4;
         break;
       default:
@@ -168,27 +181,72 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
         carbs = (tdee - (protein * 4 + fat * 9)) / 4;
     }
 
-    setMacros(Math.round(protein), Math.round(carbs), Math.round(fat), true);
+    // Ensure non-negative values and round to nearest whole number
+    protein = Math.max(0, Math.round(protein));
+    carbs = Math.max(0, Math.round(carbs));
+    fat = Math.max(0, Math.round(fat));
+
+    // Update state with calculated macros
+    setData(prev => ({
+      ...prev,
+      macros: {
+        protein,
+        carbs,
+        fat,
+      },
+      useAutoMacros: true,
+    }));
   };
 
   const saveOnboardingData = async () => {
     try {
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       if (userError) throw userError;
-
       if (!user) throw new Error('No user found');
+      if (!user.email) throw new Error('No email found for user');
 
-      const { error } = await supabase
-        .from('user_preferences')
+      // First ensure user profile exists
+      const { error: profileError } = await supabase
+        .from('user_profiles')
         .upsert({
-          user_id: user.id,
-          ...data,
+          id: user.id,
+          email: user.email,
+          onboarding_completed: true,
           updated_at: new Date().toISOString(),
+        }, {
+          onConflict: 'id'
         });
 
-      if (error) throw error;
+      if (profileError) throw profileError;
+
+      // Then save onboarding data
+      const { error: onboardingError } = await supabase
+        .from('user_onboarding')
+        .upsert({
+          user_id: user.id,
+          name: data.name,
+          gender: data.gender,
+          birthday: data.birthday?.toISOString(),
+          activity_level: data.activityLevel,
+          height_cm: data.height,
+          weight_kg: data.weight,
+          primary_goal: data.primaryGoal?.toLowerCase().replace(' ', '_'),
+          target_weight_kg: data.targetWeight,
+          weekly_pace: data.weeklyPace,
+          protein_ratio: data.macros.protein,
+          carbs_ratio: data.macros.carbs,
+          fat_ratio: data.macros.fat,
+          use_auto_macros: data.useAutoMacros,
+          onboarding_completed: true,
+          updated_at: new Date().toISOString(),
+        }, {
+          onConflict: 'user_id'
+        });
+
+      if (onboardingError) throw onboardingError;
+
     } catch (error: any) {
-      console.error('Error saving onboarding data:', error);
+      console.error('Error saving onboarding data:', error.message);
       throw error;
     }
   };

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useOnboarding } from '@/context/onboarding';
 import Animated, { 
   useAnimatedProps, 
   useSharedValue, 
@@ -20,21 +21,32 @@ const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 export default function LoaderScreen() {
   const progress = useSharedValue(0);
   const [percentage, setPercentage] = useState(0);
+  const { saveOnboardingData } = useOnboarding();
 
   const updatePercentage = (value: number) => {
     setPercentage(Math.floor(value * 100));
   };
 
   useEffect(() => {
+    const saveAndNavigate = async () => {
+      try {
+        // Save onboarding data
+        await saveOnboardingData();
+        // Navigate to completed screen
+        router.push('/(onboarding)/completed');
+      } catch (error) {
+        console.error('Failed to save onboarding data:', error);
+        // You might want to show an error message to the user here
+      }
+    };
+
     progress.value = withTiming(1, {
       duration: 4000,
       easing: Easing.linear,
     });
 
-    // Navigate to completed screen after animation
-    const timer = setTimeout(() => {
-      router.push('/(onboarding)/completed');
-    }, 4000);
+    // Wait for animation to complete before saving data
+    const timer = setTimeout(saveAndNavigate, 4000);
 
     return () => clearTimeout(timer);
   }, []);
