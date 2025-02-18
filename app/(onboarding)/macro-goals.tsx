@@ -70,7 +70,7 @@ export default function MacroGoalsScreen() {
         updated_at: new Date().toISOString()
       });
 
-      router.push('/user-goals');
+      router.push('/(onboarding)/loader');
     } catch (error: any) {
       console.error('Error saving macro goals:', error);
       Alert.alert('Error', error.message || 'Failed to save macro goals');
@@ -184,7 +184,7 @@ const styles = StyleSheet.create({
     borderRadius: 2,
   },
   progressFill: {
-    width: '90%',
+    width: '86.58%',
     height: '100%',
     backgroundColor: '#000',
     borderRadius: 2,

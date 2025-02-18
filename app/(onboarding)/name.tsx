@@ -19,7 +19,7 @@ export default function NameScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.scrollContent}>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+        <TouchableOpacity style={styles.backButton} onPress={() => router.push('/(auth)/sign-in')}>
           <Ionicons name="arrow-back" size={24} color="black" />
         </TouchableOpacity>
 
@@ -51,7 +51,7 @@ export default function NameScreen() {
           ]}
           disabled={!value.trim()}
         >
-          <Text style={styles.buttonText}>Continue</Text>
+          <Text style={styles.buttonText}>Next</Text>
         </Button>
       </View>
     </View>
@@ -92,7 +92,7 @@ const styles = StyleSheet.create({
     borderRadius: 2,
   },
   progressFill: {
-    width: '10%',
+    width: '6.66%',
     height: '100%',
     backgroundColor: '#000',
     borderRadius: 2,

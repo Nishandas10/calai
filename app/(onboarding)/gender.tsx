@@ -99,7 +99,7 @@ export default function GenderScreen() {
           ]}
           disabled={!selected}
         >
-          <Text style={styles.buttonText}>Continue</Text>
+          <Text style={styles.buttonText}>Next</Text>
         </Button>
       </View>
     </View>
@@ -140,7 +140,7 @@ const styles = StyleSheet.create({
     borderRadius: 2,
   },
   progressFill: {
-    width: '20%',
+    width: '13.32%',
     height: '100%',
     backgroundColor: '#000',
     borderRadius: 2,

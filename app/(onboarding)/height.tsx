@@ -70,7 +70,7 @@ export default function HeightScreen() {
 
   const handleNext = () => {
     setHeight(selectedHeight);
-    router.push('/(onboarding)/comparison');
+    router.push('/(onboarding)/weight');
   };
 
   return (
@@ -165,7 +165,7 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   progressFill: {
-    width: '40%',
+    width: '33.3%',
     height: '100%',
     backgroundColor: '#000',
     borderRadius: 2,

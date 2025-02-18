@@ -60,7 +60,7 @@ function useProtectedRoute(session: Session | null) {
         } else {
           if (inTabsGroup || inAuthGroup) {
             console.log('Onboarding not completed, redirecting to onboarding');
-            router.replace('/(onboarding)/completed');
+            router.replace('/(onboarding)/name');
           }
         }
       } catch (error) {
@@ -249,13 +249,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             console.error('Error creating profile:', createError);
           }
           setSession(data.session);
-          router.replace('/(onboarding)/bmi-calculator');
+          router.replace('/(onboarding)/name');
         } else {
           setSession(data.session);
           if (profile.onboarding_completed) {
             router.replace('/(tabs)');
           } else {
-            router.replace('/(onboarding)/bmi-calculator');
+            router.replace('/(onboarding)/name');
           }
         }
       }

@@ -154,7 +154,7 @@ const styles = StyleSheet.create({
     borderRadius: 2,
   },
   progressFill: {
-    width: '60%',
+    width: '66.6%',
     height: '100%',
     backgroundColor: '#000',
     borderRadius: 2,

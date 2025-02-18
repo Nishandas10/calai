@@ -68,7 +68,7 @@ export default function TargetWeightScreen() {
 
   const handleNext = () => {
     setGoals('Lose weight', selectedWeight, 0.5);
-    router.push('/(onboarding)/comparison');
+    router.push('/(onboarding)/weekly-pace');
   };
 
   return (
@@ -181,7 +181,7 @@ const styles = StyleSheet.create({
     borderRadius: 2,
   },
   progressFill: {
-    width: '50%',
+    width: '59.94%',
     height: '100%',
     backgroundColor: '#000',
     borderRadius: 2,

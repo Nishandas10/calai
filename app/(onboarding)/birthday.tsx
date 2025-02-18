@@ -21,7 +21,7 @@ export default function BirthdayScreen() {
 
   const handleNext = () => {
     setBirthday(new Date(selectedYear, selectedMonth - 1, selectedDay));
-    router.push('/(onboarding)/height');
+    router.push('/(onboarding)/goals');
   };
 
   const formatMonth = (month: number) => {
@@ -39,7 +39,7 @@ export default function BirthdayScreen() {
           title="When's your birthday?" 
           showBackButton
         />
-        <OnboardingProgress step={1} totalSteps={8} />
+        <OnboardingProgress step={7} totalSteps={15} />
       </View>
 
       <View style={styles.content}>
@@ -131,7 +131,7 @@ export default function BirthdayScreen() {
 
       <View style={styles.footer}>
         <OnboardingButton 
-          label="Continue"
+          label="Next"
           onPress={handleNext}
         />
       </View>
@@ -212,5 +212,11 @@ const styles = StyleSheet.create({
   footer: {
     paddingHorizontal: 20,
     paddingBottom: 20,
+  },
+  progressFill: {
+    width: '46.62%',
+    height: '100%',
+    backgroundColor: '#000',
+    borderRadius: 2,
   },
 }); 

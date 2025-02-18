@@ -30,6 +30,13 @@ export default function LoaderScreen() {
       duration: 4000,
       easing: Easing.linear,
     });
+
+    // Navigate to completed screen after animation
+    const timer = setTimeout(() => {
+      router.push('/(onboarding)/completed');
+    }, 4000);
+
+    return () => clearTimeout(timer);
   }, []);
 
   const animatedProps = useAnimatedProps(() => {
@@ -146,5 +153,11 @@ const styles = StyleSheet.create({
     marginTop: 60,
     paddingHorizontal: 20,
     lineHeight: 24,
+  },
+  progressFill: {
+    width: '93.24%',
+    height: '100%',
+    backgroundColor: '#000',
+    borderRadius: 2,
   },
 }); 

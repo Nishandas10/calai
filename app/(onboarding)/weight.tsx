@@ -68,7 +68,7 @@ export default function WeightScreen() {
 
   const handleNext = () => {
     setWeight(selectedWeight);
-    router.push('/(onboarding)/goals');
+    router.push('/(onboarding)/birthday');
   };
 
   return (
@@ -166,7 +166,7 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   progressFill: {
-    width: '40%',
+    width: '39.96%',
     height: '100%',
     backgroundColor: '#000',
     borderRadius: 2,

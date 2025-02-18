@@ -235,4 +235,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
+  progressFill: {
+    width: '79.92%',
+    height: '100%',
+    backgroundColor: '#000',
+    borderRadius: 2,
+  },
 }); 

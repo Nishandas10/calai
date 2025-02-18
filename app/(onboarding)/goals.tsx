@@ -59,7 +59,7 @@ export default function GoalsScreen() {
     if (selectedGoals.length > 0) {
       const primaryGoal = selectedGoals[0];
       setGoals(primaryGoal as any, null, 0);
-      router.push('/(onboarding)/macro-goals');
+      router.push('/(onboarding)/target-weight');
     }
   };
 
@@ -103,7 +103,7 @@ export default function GoalsScreen() {
 
       <View style={styles.footer}>
         <OnboardingButton 
-          label="Continue"
+          label="Next"
           onPress={handleNext}
           disabled={selectedGoals.length === 0}
         />
@@ -163,5 +163,11 @@ const styles = StyleSheet.create({
   footer: {
     paddingHorizontal: 20,
     paddingBottom: 20,
+  },
+  progressFill: {
+    width: '53.28%',
+    height: '100%',
+    backgroundColor: '#000',
+    borderRadius: 2,
   },
 }); 

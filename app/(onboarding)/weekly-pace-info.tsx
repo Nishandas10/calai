@@ -130,4 +130,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
+  progressFill: {
+    width: '73.26%',
+    height: '100%',
+    backgroundColor: '#000',
+    borderRadius: 2,
+  },
 }); 

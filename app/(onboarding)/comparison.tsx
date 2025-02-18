@@ -127,7 +127,7 @@ export default function ComparisonScreen() {
         </Animated.View>
 
         <Button
-          onPress={() => router.push('/(onboarding)/goals')}
+          onPress={() => router.push('/(onboarding)/height')}
           style={styles.nextButton}
         >
           <Text style={styles.buttonText}>Next</Text>
@@ -172,7 +172,7 @@ const styles = StyleSheet.create({
     borderRadius: 2,
   },
   progressFill: {
-    width: '30%',
+    width: '26.64%',
     height: '100%',
     backgroundColor: '#000',
     borderRadius: 2,
