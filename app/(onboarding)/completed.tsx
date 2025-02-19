@@ -16,13 +16,25 @@ export default function CompletedScreen() {
   
   // Calculate TDEE and macros
   const calculateDailyCalories = () => {
-    const { gender, weight, height, activityLevel, primaryGoal, weeklyPace } = data;
+    const { gender, weight, height, activityLevel, usersGoal, weeklyPace } = data;
+    
+    // Add safety checks for required values
+    if (!weight || !height || !activityLevel) {
+      return {
+        calories: 2000, // Default calories
+        macros: {
+          protein: 150,
+          carbs: 200,
+          fat: 67
+        }
+      };
+    }
     
     // Calculate BMR using Mifflin-St Jeor formula
     const age = data.birthday ? Math.floor((new Date().getTime() - new Date(data.birthday).getTime()) / 31557600000) : 25;
     const bmr = gender === 'male'
-      ? 10 * weight! + 6.25 * height! - 5 * age + 5
-      : 10 * weight! + 6.25 * height! - 5 * age - 161;
+      ? 10 * weight + 6.25 * height - 5 * age + 5
+      : 10 * weight + 6.25 * height - 5 * age - 161;
 
     // Activity multipliers
     const activityMultipliers = {
@@ -33,50 +45,188 @@ export default function CompletedScreen() {
       5: 1.9,  // Super active
     };
 
-    // Calculate TDEE
-    const tdee = bmr * activityMultipliers[activityLevel as keyof typeof activityMultipliers];
+    // Calculate TDEE with safety check
+    const multiplier = activityMultipliers[activityLevel as keyof typeof activityMultipliers] || 1.2;
+    const tdee = bmr * multiplier;
 
-    // Adjust calories based on goal and weekly pace
+    // Calculate macros based on goal
     let dailyCalories = tdee;
-    const goal = primaryGoal?.toLowerCase().replace(' ', '_');
-    
-    if (goal === 'lose_weight') {
-      dailyCalories -= (weeklyPace || 0.5) * 1100; // 1100 calories deficit per kg per week
-    } else if (goal === 'gain_muscle' || goal === 'gain_weight') {
-      dailyCalories += 500; // Standard surplus for muscle gain
+    let protein = 0, carbs = 0, fat = 0;
+
+    // Ensure weight is available for calculations
+    const safeWeight = weight || 70; // Default to 70kg if weight is not available
+
+    switch (usersGoal) {
+      case 'Lose weight':
+        protein = safeWeight * 2.2;
+        fat = safeWeight * 0.8;
+        dailyCalories = tdee * 0.8;
+        dailyCalories -= (weeklyPace || 0.5) * 1100;
+        break;
+
+      case 'Gain muscle':
+        protein = safeWeight * 2.4;
+        fat = safeWeight * 1.0;
+        dailyCalories = tdee * 1.1;
+        dailyCalories += (weeklyPace || 0.5) * 500;
+        break;
+
+      case 'Maintain':
+        protein = safeWeight * 1.8;
+        fat = safeWeight * 0.8;
+        dailyCalories = tdee;
+        break;
+
+      case 'Boost Energy':
+        protein = safeWeight * 1.8;
+        fat = safeWeight * 0.7;
+        dailyCalories = tdee * 1.1;
+        break;
+
+      case 'Improve Nutrition':
+        protein = safeWeight * 2.0;
+        fat = safeWeight * 0.85;
+        dailyCalories = tdee;
+        break;
+
+      case 'Gain Weight':
+        protein = safeWeight * 2.0;
+        fat = safeWeight * 1.1;
+        dailyCalories = tdee * 1.15;
+        dailyCalories += (weeklyPace || 0.5) * 1100;
+        break;
+
+      default:
+        protein = safeWeight * 2.0;
+        fat = safeWeight * 0.9;
+        dailyCalories = tdee;
     }
 
-    return Math.round(dailyCalories);
+    // Ensure minimum calories
+    dailyCalories = Math.max(1200, dailyCalories);
+
+    // Calculate carbs from remaining calories
+    const proteinCalories = protein * 4;
+    const fatCalories = fat * 9;
+    carbs = Math.max(0, (dailyCalories - (proteinCalories + fatCalories)) / 4);
+
+    // Ensure non-negative values and round
+    protein = Math.max(0, Math.round(protein));
+    carbs = Math.max(0, Math.round(carbs));
+    fat = Math.max(0, Math.round(fat));
+
+    return {
+      calories: Math.round(dailyCalories),
+      macros: { protein, carbs, fat }
+    };
   };
 
-  const renderProgressCircle = (progress: number, color: string, size: number = CIRCLE_SIZE) => (
-    <Svg width={size} height={size}>
-      <Circle
-        cx={size / 2}
-        cy={size / 2}
-        r={(size - 10) / 2}
-        stroke="#E8E8E8"
-        strokeWidth={8}
-        fill="none"
-      />
-      <Circle
-        cx={size / 2}
-        cy={size / 2}
-        r={(size - 10) / 2}
-        stroke={color}
-        strokeWidth={8}
-        strokeDasharray={`${progress * size * Math.PI} ${size * Math.PI}`}
-        strokeLinecap="round"
-        fill="none"
-        transform={`rotate(-90 ${size / 2} ${size / 2})`}
-      />
-    </Svg>
-  );
+  const { calories: dailyCalories, macros } = calculateDailyCalories();
+  const { protein: proteinGrams, carbs: carbsGrams, fat: fatGrams } = macros;
 
-  const dailyCalories = calculateDailyCalories();
-  const proteinGrams = Math.round(data.weight! * 2); // 2g per kg of body weight
-  const fatGrams = Math.round(dailyCalories * 0.25 / 9); // 25% of calories from fat
-  const carbsGrams = Math.round((dailyCalories - (proteinGrams * 4 + fatGrams * 9)) / 4); // Remaining calories from carbs
+  // Add safety checks for macro calculations
+  const totalCalories = dailyCalories || 2000; // Fallback to 2000 if undefined
+  const safeProtein = proteinGrams || 0;
+  const safeCarbs = carbsGrams || 0;
+  const safeFat = fatGrams || 0;
+
+  // Calculate percentages safely
+  const proteinPercentage = Math.round((safeProtein * 4 * 100) / totalCalories) || 0;
+  const carbsPercentage = Math.round((safeCarbs * 4 * 100) / totalCalories) || 0;
+  const fatPercentage = Math.round((safeFat * 9 * 100) / totalCalories) || 0;
+
+  // Add color gradient functions
+  const getProteinColor = (percentage: number) => {
+    if (percentage < 10) return '#FFE5E5';     // Very low - light red
+    if (percentage < 20) return '#FFB6B6';     // Low - medium red
+    if (percentage < 30) return '#FF6B6B';     // Target range - vibrant red
+    return '#FF4444';                          // High - deep red
+  };
+
+  const getCarbsColor = (percentage: number) => {
+    if (percentage < 20) return '#E0F7F5';     // Very low - light teal
+    if (percentage < 35) return '#98E2DD';     // Low - medium teal
+    if (percentage < 50) return '#4ECDC4';     // Target range - vibrant teal
+    return '#2BA89F';                          // High - deep teal
+  };
+
+  const getFatColor = (percentage: number) => {
+    if (percentage < 15) return '#FFF8E0';     // Very low - light gold
+    if (percentage < 25) return '#FFE066';     // Low - medium gold
+    if (percentage < 35) return '#FFD700';     // Target range - vibrant gold
+    return '#FFB700';                          // High - deep gold
+  };
+
+  const renderProgressCircle = (progress: number, baseColor: string, percentage: number, type: 'protein' | 'carbs' | 'fat' | 'calories') => {
+    // Get dynamic color based on type and percentage
+    let color;
+    switch (type) {
+      case 'calories':
+        color = baseColor;
+        break;
+      case 'protein':
+        color = getProteinColor(percentage);
+        break;
+      case 'carbs':
+        color = getCarbsColor(percentage);
+        break;
+      case 'fat':
+        color = getFatColor(percentage);
+        break;
+      default:
+        color = baseColor;
+    }
+
+    return (
+      <Svg width={CIRCLE_SIZE} height={CIRCLE_SIZE}>
+        <Circle
+          cx={CIRCLE_SIZE / 2}
+          cy={CIRCLE_SIZE / 2}
+          r={(CIRCLE_SIZE - 10) / 2}
+          stroke="#E8E8E8"
+          strokeWidth={8}
+          fill="none"
+        />
+        <Circle
+          cx={CIRCLE_SIZE / 2}
+          cy={CIRCLE_SIZE / 2}
+          r={(CIRCLE_SIZE - 10) / 2}
+          stroke={color}
+          strokeWidth={8}
+          strokeDasharray={`${progress * CIRCLE_SIZE * Math.PI} ${CIRCLE_SIZE * Math.PI}`}
+          strokeLinecap="round"
+          fill="none"
+          transform={`rotate(-90 ${CIRCLE_SIZE / 2} ${CIRCLE_SIZE / 2})`}
+        />
+      </Svg>
+    );
+  };
+
+  const MacroIcon = ({ type }: { type: 'protein' | 'carbs' | 'fat' }) => {
+    let iconName = '';
+    let iconColor = '';
+
+    switch (type) {
+      case 'protein':
+        iconName = 'barbell-outline';
+        iconColor = '#FF6B6B';
+        break;
+      case 'carbs':
+        iconName = 'nutrition-outline';
+        iconColor = '#4ECDC4';
+        break;
+      case 'fat':
+        iconName = 'water-outline';
+        iconColor = '#FFD700';
+        break;
+    }
+
+    return (
+      <View style={styles.macroIconContainer}>
+        <Ionicons name={iconName as any} size={24} color={iconColor} />
+      </View>
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -115,26 +265,49 @@ export default function CompletedScreen() {
           <View style={styles.recommendationCard}>
             <View style={styles.recommendationHeader}>
               <Text style={styles.recommendationTitle}>Daily Recommendation</Text>
-              <Text style={styles.recommendationSubtitle}>You can edit this any time</Text>
             </View>
 
             <View style={styles.macrosGrid}>
+              {/* Calories Circle - Top Left */}
               <View style={styles.macroCard}>
-                {renderProgressCircle(0.33, '#FF6B6B')}
-                <Text style={styles.macroValue}>{proteinGrams}g</Text>
-                <Text style={styles.macroLabel}>Protein</Text>
+                {renderProgressCircle(0.85, '#000', 85, 'calories')}
+                <View style={styles.caloriesContent}>
+                  <Text style={styles.caloriesValue}>{dailyCalories}</Text>
+                  <Text style={styles.caloriesLabel}>kcal/day</Text>
+                </View>
               </View>
 
+              {/* Carbs Circle - Top Right */}
               <View style={styles.macroCard}>
-                {renderProgressCircle(0.33, '#4ECDC4')}
-                <Text style={styles.macroValue}>{carbsGrams}g</Text>
+                {renderProgressCircle(carbsPercentage / 100, '#4ECDC4', carbsPercentage, 'carbs')}
+                <MacroIcon type="carbs" />
+                <Text style={styles.macroValue}>{safeCarbs}g</Text>
                 <Text style={styles.macroLabel}>Carbs</Text>
+                <Text style={[styles.macroPercentage, { color: getCarbsColor(carbsPercentage) }]}>
+                  {carbsPercentage}%
+                </Text>
               </View>
 
+              {/* Protein Circle - Bottom Left */}
               <View style={styles.macroCard}>
-                {renderProgressCircle(0.33, '#45B7D1')}
-                <Text style={styles.macroValue}>{fatGrams}g</Text>
+                {renderProgressCircle(proteinPercentage / 100, '#FF6B6B', proteinPercentage, 'protein')}
+                <MacroIcon type="protein" />
+                <Text style={styles.macroValue}>{safeProtein}g</Text>
+                <Text style={styles.macroLabel}>Protein</Text>
+                <Text style={[styles.macroPercentage, { color: getProteinColor(proteinPercentage) }]}>
+                  {proteinPercentage}%
+                </Text>
+              </View>
+
+              {/* Fat Circle - Bottom Right */}
+              <View style={styles.macroCard}>
+                {renderProgressCircle(fatPercentage / 100, '#FFD700', fatPercentage, 'fat')}
+                <MacroIcon type="fat" />
+                <Text style={styles.macroValue}>{safeFat}g</Text>
                 <Text style={styles.macroLabel}>Fat</Text>
+                <Text style={[styles.macroPercentage, { color: getFatColor(fatPercentage) }]}>
+                  {fatPercentage}%
+                </Text>
               </View>
             </View>
 
@@ -239,31 +412,49 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   recommendationHeader: {
-    marginBottom: 20,
+    marginBottom: 16,
+    alignItems: 'center',
   },
   recommendationTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold',
     color: '#000',
     marginBottom: 4,
-  },
-  recommendationSubtitle: {
-    fontSize: 14,
-    color: '#666',
   },
   macrosGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
+    gap: 16,
     marginBottom: 20,
   },
   macroCard: {
-    width: '48%',
-    marginBottom: 12,
+    width: '47%',
     alignItems: 'center',
     backgroundColor: '#f8f8f8',
     borderRadius: 16,
     padding: 16,
+    position: 'relative',
+  },
+  macroIconContainer: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    transform: [{ translateX: -12 }, { translateY: -12 }],
+    width: 24,
+    height: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 3,
   },
   macroValue: {
     fontSize: 20,
@@ -275,6 +466,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     marginTop: 4,
+    fontWeight: '600',
+  },
+  macroPercentage: {
+    fontSize: 12,
+    marginTop: 4,
+    fontWeight: '500',
   },
   healthScore: {
     flexDirection: 'row',
@@ -314,5 +511,24 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  caloriesContent: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  caloriesValue: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#000',
+  },
+  caloriesLabel: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 4,
   },
 }); 
