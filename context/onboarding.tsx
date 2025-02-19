@@ -3,7 +3,7 @@ import { supabase } from '@/lib/supabase';
 
 type DietaryPreference = 'Vegetarian' | 'Vegan' | 'Gluten-free' | 'Dairy-free';
 type DietStyle = 'Keto' | 'Low-carb' | 'Mediterranean' | 'None';
-type Goal = 'Lose weight' | 'Maintain' | 'Gain muscle' | 'Healthy lifestyle';
+type Goal = 'Lose weight' | 'Maintain' | 'Gain muscle' | 'Boost Energy' | 'Improve Nutrition' | 'Gain Weight';
 
 interface OnboardingData {
   // User Info
@@ -16,7 +16,7 @@ interface OnboardingData {
   unit: 'metric' | 'imperial';
   
   // Goals
-  primaryGoal: Goal | null;
+  usersGoal: Goal | null;
   targetWeight: number | null;
   weeklyPace: number | null;
   
@@ -57,7 +57,7 @@ const defaultOnboardingData: OnboardingData = {
   height: null,
   weight: null,
   unit: 'metric',
-  primaryGoal: null,
+  usersGoal: null,
   targetWeight: null,
   weeklyPace: null,
   dietaryPreferences: [],
@@ -79,6 +79,36 @@ const convertToMetric = {
 const convertToImperial = {
   height: (cm: number) => cm / 30.48, // cm to ft
   weight: (kg: number) => kg / 0.453592, // kg to lb
+};
+
+// Database goal mapping
+const goalToDbValue = (goal: Goal | null): string | null => {
+  if (!goal) {
+    console.log('No goal provided to goalToDbValue');
+    return null;
+  }
+  
+  console.log('Converting goal to DB value:', goal);
+  
+  // Direct mapping without switch
+  const goalMapping = {
+    'Lose weight': 'lose_weight',
+    'Gain muscle': 'gain_muscle',
+    'Maintain': 'maintain',
+    'Boost Energy': 'boost_energy',
+    'Improve Nutrition': 'improve_nutrition',
+    'Gain Weight': 'gain_weight'
+  } as const;
+
+  const dbValue = goalMapping[goal];
+  console.log('Mapped DB value:', dbValue);
+  
+  if (!dbValue) {
+    console.error('Invalid goal value:', goal);
+    return 'maintain';
+  }
+  
+  return dbValue;
 };
 
 const OnboardingContext = createContext<OnboardingContextType | undefined>(undefined);
@@ -123,12 +153,36 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
   };
 
   const setGoals = (goal: Goal, targetWeight: number | null, pace: number) => {
-    setData(prev => ({
-      ...prev,
-      primaryGoal: goal,
-      targetWeight: targetWeight,
-      weeklyPace: pace,
-    }));
+    console.log('setGoals called with:', {
+      goal,
+      targetWeight,
+      pace,
+      goalType: typeof goal,
+      validGoal: ['Lose weight', 'Maintain', 'Gain muscle', 'Boost Energy', 'Improve Nutrition', 'Gain Weight'].includes(goal)
+    });
+
+    // Validate the goal value
+    if (!goal) {
+      console.error('Goal is null or undefined');
+      return;
+    }
+
+    // Log the exact goal string
+    console.log('Goal string:', JSON.stringify(goal));
+    
+    setData(prev => {
+      const newData = {
+        ...prev,
+        usersGoal: goal,
+        targetWeight: targetWeight,
+        weeklyPace: pace,
+      };
+      console.log('State after update:', {
+        previousGoal: prev.usersGoal,
+        newGoal: newData.usersGoal
+      });
+      return newData;
+    });
   };
 
   const setDietaryPreferences = (preferences: DietaryPreference[], style: DietStyle) => {
@@ -171,26 +225,47 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
 
     // Calculate macros based on goal
     let protein = 0, carbs = 0, fat = 0;
-    const primaryGoal = data.primaryGoal?.toLowerCase().replace(' ', '_');
+    const userGoal = data.usersGoal;
 
-    switch (primaryGoal) {
-      case 'lose_weight':
-        protein = weight * 2.2; // 2.2g per kg of body weight
-        fat = weight * 0.8; // 0.8g per kg of body weight
-        carbs = (tdee - (protein * 4 + fat * 9)) / 4; // Remaining calories from carbs
+    switch (userGoal) {
+      case 'Lose weight':
+        protein = weight * 2.2; // Higher protein for muscle preservation
+        fat = weight * 0.8;     // Moderate fat
+        carbs = (tdee * 0.8 - (protein * 4 + fat * 9)) / 4; // 20% deficit
         break;
-      case 'gain_muscle':
-        protein = weight * 2.4;
-        fat = weight * 1;
-        carbs = (tdee - (protein * 4 + fat * 9)) / 4;
+
+      case 'Gain muscle':
+        protein = weight * 2.4; // High protein for muscle growth
+        fat = weight * 1.0;     // Moderate to high fat
+        carbs = (tdee * 1.1 - (protein * 4 + fat * 9)) / 4; // 10% surplus
         break;
-      case 'maintain':
-        protein = weight * 2;
+
+      case 'Maintain':
+        protein = weight * 2.0;
         fat = weight * 0.9;
         carbs = (tdee - (protein * 4 + fat * 9)) / 4;
         break;
+
+      case 'Boost Energy':
+        protein = weight * 1.8; // Moderate protein
+        fat = weight * 0.8;     // Moderate fat
+        carbs = (tdee * 1.05 - (protein * 4 + fat * 9)) / 4; // Higher carbs for energy
+        break;
+
+      case 'Improve Nutrition':
+        protein = weight * 2.0;
+        fat = weight * 0.85;
+        carbs = (tdee - (protein * 4 + fat * 9)) / 4;
+        break;
+
+      case 'Gain Weight':
+        protein = weight * 2.0; // Moderate protein
+        fat = weight * 1.1;     // Higher fat
+        carbs = (tdee * 1.15 - (protein * 4 + fat * 9)) / 4; // 15% surplus
+        break;
+
       default:
-        protein = weight * 2;
+        protein = weight * 2.0;
         fat = weight * 0.9;
         carbs = (tdee - (protein * 4 + fat * 9)) / 4;
     }
@@ -223,56 +298,51 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
     try {
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       if (userError) throw userError;
-      if (!user) throw new Error('No user found');
-      if (!user.email) throw new Error('No email found for user');
+      if (!user?.id || !user?.email) throw new Error('Invalid user data');
 
-      // First ensure user profile exists
-      const { error: profileError } = await supabase
-        .from('user_profiles')
-        .upsert({
-          id: user.id,
-          email: user.email,
-          onboarding_completed: true,
-          updated_at: new Date().toISOString(),
-        }, {
-          onConflict: 'id'
-        });
+      console.log('Current state before save:', data);
+      console.log('Current goal before conversion:', data.usersGoal);
+      
+      const dbGoalValue = goalToDbValue(data.usersGoal);
+      console.log('Converted goal value:', dbGoalValue);
 
-      if (profileError) throw profileError;
+      // Prepare the data to be saved
+      const onboardingData = {
+        user_id: user.id,
+        name: data.name,
+        gender: data.gender,
+        birthday: data.birthday?.toISOString(),
+        activity_level: data.activityLevel,
+        height_cm: data.unit === 'metric' ? data.height : convertToMetric.height(data.height!),
+        weight_kg: data.unit === 'metric' ? data.weight : convertToMetric.weight(data.weight!),
+        users_goal: dbGoalValue,
+        target_weight_kg: data.unit === 'metric' ? data.targetWeight : convertToMetric.weight(data.targetWeight!),
+        weekly_pace: data.weeklyPace,
+        protein_ratio: data.macros.protein,
+        carbs_ratio: data.macros.carbs,
+        fat_ratio: data.macros.fat,
+        use_auto_macros: data.useAutoMacros,
+        onboarding_completed: true,
+        updated_at: new Date().toISOString(),
+      };
 
-      // Convert to metric if user input was in imperial
-      const height_cm = data.unit === 'metric' ? data.height : convertToMetric.height(data.height!);
-      const weight_kg = data.unit === 'metric' ? data.weight : convertToMetric.weight(data.weight!);
-      const target_weight_kg = data.unit === 'metric' ? data.targetWeight : convertToMetric.weight(data.targetWeight!);
+      console.log('Final data being saved:', onboardingData);
 
-      // Save onboarding data (all in metric units)
       const { error: onboardingError } = await supabase
         .from('user_onboarding')
-        .upsert({
-          user_id: user.id,
-          name: data.name,
-          gender: data.gender,
-          birthday: data.birthday?.toISOString(),
-          activity_level: data.activityLevel,
-          height_cm,
-          weight_kg,
-          primary_goal: data.primaryGoal?.toLowerCase().replace(' ', '_'),
-          target_weight_kg,
-          weekly_pace: data.weeklyPace,
-          protein_ratio: data.macros.protein,
-          carbs_ratio: data.macros.carbs,
-          fat_ratio: data.macros.fat,
-          use_auto_macros: data.useAutoMacros,
-          onboarding_completed: true,
-          updated_at: new Date().toISOString(),
-        }, {
+        .upsert(onboardingData, {
           onConflict: 'user_id'
         });
 
-      if (onboardingError) throw onboardingError;
+      if (onboardingError) {
+        console.error('Onboarding error:', onboardingError);
+        throw onboardingError;
+      }
+
+      console.log('Save successful');
 
     } catch (error: any) {
-      console.error('Error saving onboarding data:', error.message);
+      console.error('Error saving onboarding data:', error);
       throw error;
     }
   };

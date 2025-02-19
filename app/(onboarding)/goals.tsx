@@ -57,8 +57,16 @@ export default function GoalsScreen() {
 
   const handleNext = () => {
     if (selectedGoals.length > 0) {
-      const primaryGoal = selectedGoals[0];
-      setGoals(primaryGoal as any, null, 0);
+      const goalMapping = {
+        'lose_weight': 'Lose weight',
+        'gain_muscle': 'Gain muscle',
+        'maintain': 'Maintain',
+        'boost_energy': 'Boost Energy',
+        'improve_nutrition': 'Improve Nutrition',
+        'gain_weight': 'Gain Weight'
+      } as const;
+      const primaryGoal = goalMapping[selectedGoals[0] as keyof typeof goalMapping];
+      setGoals(primaryGoal, null, 0);
       router.push('/(onboarding)/target-weight');
     }
   };

@@ -15,8 +15,8 @@ CREATE TABLE IF NOT EXISTS public.user_onboarding (
     weight_kg DECIMAL(5,2) NOT NULL,
     
     -- Goals
-    primary_goal VARCHAR(50) CHECK (
-        primary_goal IN (
+    users_goal VARCHAR(50) CHECK (
+        users_goal IN (
             'lose_weight',
             'gain_muscle',
             'maintain',

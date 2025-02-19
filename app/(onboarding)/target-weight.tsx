@@ -20,7 +20,7 @@ const MARK_COUNT = 81; // One mark every 2kg
 const DEFAULT_WEIGHT = 70;
 
 export default function TargetWeightScreen() {
-  const { setGoals } = useOnboarding();
+  const { setGoals, data } = useOnboarding();
   const [selectedWeight, setSelectedWeight] = useState(DEFAULT_WEIGHT);
   const [unit, setUnit] = useState<'kg' | 'lb'>('kg');
 
@@ -69,7 +69,7 @@ export default function TargetWeightScreen() {
   const handleNext = () => {
     if (selectedWeight) {
       setGoals(
-        'Lose weight',
+        data.usersGoal || 'Maintain',
         selectedWeight,
         0
       );

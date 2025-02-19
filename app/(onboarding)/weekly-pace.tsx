@@ -54,7 +54,7 @@ export default function WeeklyPaceScreen() {
 
   const handleNext = () => {
     setGoals(
-      data.primaryGoal || 'Lose weight',
+      data.usersGoal || 'Maintain',
       data.targetWeight,
       selectedPace
     );
