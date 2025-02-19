@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Circle } from 'react-native-svg';
 import Animated, { FadeIn } from 'react-native-reanimated';
+import { useOnboarding } from '@/context/onboarding';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const CIRCLE_SIZE = (SCREEN_WIDTH - 100) / 2; // Slightly smaller circles
@@ -11,39 +12,71 @@ const CIRCLE_RADIUS = (CIRCLE_SIZE - 32) / 2; // Adjusted radius
 const CIRCLE_LENGTH = 2 * Math.PI * CIRCLE_RADIUS;
 
 export default function CompletedScreen() {
-  const macros = [
-    { label: 'Calories', value: '1934', color: '#000000', unit: '' },
-    { label: 'Carbs', value: '190', color: '#FFA726', unit: 'g' },
-    { label: 'Protein', value: '172', color: '#EF5350', unit: 'g' },
-    { label: 'Fats', value: '53', color: '#42A5F5', unit: 'g' },
-  ];
+  const { data } = useOnboarding();
+  
+  // Calculate TDEE and macros
+  const calculateDailyCalories = () => {
+    const { gender, weight, height, activityLevel, primaryGoal, weeklyPace } = data;
+    
+    // Calculate BMR using Mifflin-St Jeor formula
+    const age = data.birthday ? Math.floor((new Date().getTime() - new Date(data.birthday).getTime()) / 31557600000) : 25;
+    const bmr = gender === 'male'
+      ? 10 * weight! + 6.25 * height! - 5 * age + 5
+      : 10 * weight! + 6.25 * height! - 5 * age - 161;
 
-  const renderProgressCircle = (progress: number, color: string) => (
-    <Svg width={CIRCLE_SIZE} height={CIRCLE_SIZE}>
-      {/* Background circle */}
+    // Activity multipliers
+    const activityMultipliers = {
+      1: 1.2,  // Sedentary
+      2: 1.375,  // Lightly active
+      3: 1.55,  // Moderately active
+      4: 1.725,  // Very active
+      5: 1.9,  // Super active
+    };
+
+    // Calculate TDEE
+    const tdee = bmr * activityMultipliers[activityLevel as keyof typeof activityMultipliers];
+
+    // Adjust calories based on goal and weekly pace
+    let dailyCalories = tdee;
+    const goal = primaryGoal?.toLowerCase().replace(' ', '_');
+    
+    if (goal === 'lose_weight') {
+      dailyCalories -= (weeklyPace || 0.5) * 1100; // 1100 calories deficit per kg per week
+    } else if (goal === 'gain_muscle' || goal === 'gain_weight') {
+      dailyCalories += 500; // Standard surplus for muscle gain
+    }
+
+    return Math.round(dailyCalories);
+  };
+
+  const renderProgressCircle = (progress: number, color: string, size: number = CIRCLE_SIZE) => (
+    <Svg width={size} height={size}>
       <Circle
-        cx={CIRCLE_SIZE / 2}
-        cy={CIRCLE_SIZE / 2}
-        r={CIRCLE_RADIUS}
+        cx={size / 2}
+        cy={size / 2}
+        r={(size - 10) / 2}
         stroke="#E8E8E8"
         strokeWidth={8}
         fill="none"
       />
-      {/* Progress circle */}
       <Circle
-        cx={CIRCLE_SIZE / 2}
-        cy={CIRCLE_SIZE / 2}
-        r={CIRCLE_RADIUS}
+        cx={size / 2}
+        cy={size / 2}
+        r={(size - 10) / 2}
         stroke={color}
         strokeWidth={8}
-        strokeDasharray={CIRCLE_LENGTH}
-        strokeDashoffset={CIRCLE_LENGTH * (1 - progress)}
+        strokeDasharray={`${progress * size * Math.PI} ${size * Math.PI}`}
         strokeLinecap="round"
         fill="none"
-        transform={`rotate(-90 ${CIRCLE_SIZE / 2} ${CIRCLE_SIZE / 2})`}
+        transform={`rotate(-90 ${size / 2} ${size / 2})`}
       />
     </Svg>
   );
+
+  const dailyCalories = calculateDailyCalories();
+  const proteinGrams = Math.round(data.weight! * 2); // 2g per kg of body weight
+  const fatGrams = Math.round(dailyCalories * 0.25 / 9); // 25% of calories from fat
+  const carbsGrams = Math.round((dailyCalories - (proteinGrams * 4 + fatGrams * 9)) / 4); // Remaining calories from carbs
 
   return (
     <SafeAreaView style={styles.container}>
@@ -86,20 +119,23 @@ export default function CompletedScreen() {
             </View>
 
             <View style={styles.macrosGrid}>
-              {macros.map((macro, index) => (
-                <View key={index} style={styles.macroItem}>
-                  <Text style={styles.macroLabel}>{macro.label}</Text>
-                  <View style={styles.macroCircle}>
-                    {renderProgressCircle(0.75, macro.color)}
-                    <View style={styles.macroValueContainer}>
-                      <Text style={styles.macroValue}>{macro.value}{macro.unit}</Text>
-                      <TouchableOpacity style={styles.editButton}>
-                        <Ionicons name="pencil" size={14} color="#666" />
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                </View>
-              ))}
+              <View style={styles.macroCard}>
+                {renderProgressCircle(0.33, '#FF6B6B')}
+                <Text style={styles.macroValue}>{proteinGrams}g</Text>
+                <Text style={styles.macroLabel}>Protein</Text>
+              </View>
+
+              <View style={styles.macroCard}>
+                {renderProgressCircle(0.33, '#4ECDC4')}
+                <Text style={styles.macroValue}>{carbsGrams}g</Text>
+                <Text style={styles.macroLabel}>Carbs</Text>
+              </View>
+
+              <View style={styles.macroCard}>
+                {renderProgressCircle(0.33, '#45B7D1')}
+                <Text style={styles.macroValue}>{fatGrams}g</Text>
+                <Text style={styles.macroLabel}>Fat</Text>
+              </View>
             </View>
 
             <View style={styles.healthScore}>
@@ -221,40 +257,24 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 20,
   },
-  macroItem: {
+  macroCard: {
     width: '48%',
     marginBottom: 12,
-  },
-  macroLabel: {
-    fontSize: 16,
-    color: '#000',
-    marginBottom: 6,
-  },
-  macroCircle: {
     alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: '#f8f8f8',
     borderRadius: 16,
-    padding: 12,
-  },
-  macroValueContainer: {
-    position: 'absolute',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
+    padding: 16,
   },
   macroValue: {
     fontSize: 20,
     fontWeight: 'bold',
     color: '#000',
+    marginTop: 12,
   },
-  editButton: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: '#f0f0f0',
-    justifyContent: 'center',
-    alignItems: 'center',
+  macroLabel: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 4,
   },
   healthScore: {
     flexDirection: 'row',

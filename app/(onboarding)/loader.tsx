@@ -22,33 +22,35 @@ export default function LoaderScreen() {
   const progress = useSharedValue(0);
   const [percentage, setPercentage] = useState(0);
   const { saveOnboardingData } = useOnboarding();
+  const [error, setError] = useState<string | null>(null);
 
   const updatePercentage = (value: number) => {
     setPercentage(Math.floor(value * 100));
   };
 
+  const saveAndNavigate = async () => {
+    try {
+      // Start progress animation
+      progress.value = withTiming(1, {
+        duration: 2000,
+        easing: Easing.linear,
+      });
+
+      // Save onboarding data
+      await saveOnboardingData();
+      
+      // Wait for animation to complete then navigate
+      setTimeout(() => {
+        router.replace('/(onboarding)/completed');
+      }, 2000);
+    } catch (error: any) {
+      console.error('Failed to save onboarding data:', error);
+      setError(error?.message || 'Failed to save your data. Please try again.');
+    }
+  };
+
   useEffect(() => {
-    const saveAndNavigate = async () => {
-      try {
-        // Save onboarding data
-        await saveOnboardingData();
-        // Navigate to completed screen
-        router.push('/(onboarding)/completed');
-      } catch (error) {
-        console.error('Failed to save onboarding data:', error);
-        // You might want to show an error message to the user here
-      }
-    };
-
-    progress.value = withTiming(1, {
-      duration: 4000,
-      easing: Easing.linear,
-    });
-
-    // Wait for animation to complete before saving data
-    const timer = setTimeout(saveAndNavigate, 4000);
-
-    return () => clearTimeout(timer);
+    saveAndNavigate();
   }, []);
 
   const animatedProps = useAnimatedProps(() => {
@@ -105,8 +107,21 @@ export default function LoaderScreen() {
         </View>
 
         <Text style={styles.subtitle}>
-          Hang tight! We're crafting a personalized plan just for you.
+          {error || "Hang tight! We're crafting a personalized plan just for you."}
         </Text>
+
+        {error && (
+          <TouchableOpacity
+            style={styles.retryButton}
+            onPress={() => {
+              setError(null);
+              progress.value = 0;
+              saveAndNavigate();
+            }}
+          >
+            <Text style={styles.retryButtonText}>Try Again</Text>
+          </TouchableOpacity>
+        )}
       </Animated.View>
     </View>
   );
@@ -166,10 +181,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     lineHeight: 24,
   },
-  progressFill: {
-    width: '93.24%',
-    height: '100%',
+  retryButton: {
+    marginTop: 20,
     backgroundColor: '#000',
-    borderRadius: 2,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 25,
+  },
+  retryButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
 }); 

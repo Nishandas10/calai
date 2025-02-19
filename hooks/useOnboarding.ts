@@ -1,11 +1,11 @@
 import { useState } from "react";
 import { useRouter } from "expo-router";
 import {
-  saveOnboardingData,
-  HealthMetrics,
-  UserGoals,
   DietaryPreferences,
+  HealthMetrics,
   MacroGoals,
+  saveOnboardingData,
+  UserGoals,
 } from "../lib/api/onboarding";
 
 export const useOnboarding = () => {
@@ -17,7 +17,7 @@ export const useOnboarding = () => {
     healthMetrics: HealthMetrics,
     goals: UserGoals,
     dietaryPreferences: DietaryPreferences,
-    macroGoals: MacroGoals
+    macroGoals: MacroGoals,
   ) => {
     try {
       setIsLoading(true);
@@ -27,7 +27,7 @@ export const useOnboarding = () => {
         healthMetrics,
         goals,
         dietaryPreferences,
-        macroGoals
+        macroGoals,
       );
 
       // Navigate to the main app after successful onboarding
@@ -36,7 +36,7 @@ export const useOnboarding = () => {
       setError(
         err instanceof Error
           ? err.message
-          : "An error occurred during onboarding"
+          : "An error occurred during onboarding",
       );
       console.error("Onboarding error:", err);
     } finally {

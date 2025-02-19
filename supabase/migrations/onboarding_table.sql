@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS public.user_onboarding (
     gender VARCHAR(20) CHECK (gender IN ('male', 'female', 'prefer_not_to_say')),
     birthday DATE NOT NULL,
     activity_level INTEGER CHECK (activity_level BETWEEN 1 AND 5),
+    -- Height and Weight (stored in metric)
     height_cm DECIMAL(5,2) NOT NULL,
     weight_kg DECIMAL(5,2) NOT NULL,
     
@@ -47,7 +48,7 @@ CREATE TABLE IF NOT EXISTS public.user_onboarding (
         UNIQUE(user_id)
 );
 
--- Create updated_at trigger
+-- Create updated_at trigger function if it doesn't exist
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -56,6 +57,8 @@ BEGIN
 END;
 $$ language 'plpgsql';
 
+-- Drop trigger if exists and create it again
+DROP TRIGGER IF EXISTS update_user_onboarding_updated_at ON public.user_onboarding;
 CREATE TRIGGER update_user_onboarding_updated_at
     BEFORE UPDATE ON public.user_onboarding
     FOR EACH ROW
@@ -66,4 +69,4 @@ CREATE INDEX IF NOT EXISTS idx_user_onboarding_user_id ON public.user_onboarding
 CREATE INDEX IF NOT EXISTS idx_user_onboarding_created_at ON public.user_onboarding(created_at);
 
 -- Add table comment
-COMMENT ON TABLE public.user_onboarding IS 'Stores user onboarding data including personal info, goals, and macro preferences'; 
+COMMENT ON TABLE public.user_onboarding IS 'Stores user onboarding data including personal info, goals, and macro preferences in both metric and imperial units'; 

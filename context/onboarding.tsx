@@ -13,6 +13,7 @@ interface OnboardingData {
   activityLevel: number | null;
   height: number | null;
   weight: number | null;
+  unit: 'metric' | 'imperial';
   
   // Goals
   primaryGoal: Goal | null;
@@ -45,6 +46,7 @@ interface OnboardingContextType {
   setMacros: (protein: number, carbs: number, fat: number, useAuto: boolean) => void;
   calculateMacros: (weight: number, height: number, age: number, gender: string, activityLevel: number) => void;
   saveOnboardingData: () => Promise<void>;
+  setUnit: (unit: 'metric' | 'imperial') => void;
 }
 
 const defaultOnboardingData: OnboardingData = {
@@ -54,6 +56,7 @@ const defaultOnboardingData: OnboardingData = {
   activityLevel: null,
   height: null,
   weight: null,
+  unit: 'metric',
   primaryGoal: null,
   targetWeight: null,
   weeklyPace: null,
@@ -65,6 +68,17 @@ const defaultOnboardingData: OnboardingData = {
     fat: 0,
   },
   useAutoMacros: false,
+};
+
+// Unit conversion functions
+const convertToMetric = {
+  height: (ft: number) => ft * 30.48, // ft to cm
+  weight: (lb: number) => lb * 0.453592, // lb to kg
+};
+
+const convertToImperial = {
+  height: (cm: number) => cm / 30.48, // cm to ft
+  weight: (kg: number) => kg / 0.453592, // kg to lb
 };
 
 const OnboardingContext = createContext<OnboardingContextType | undefined>(undefined);
@@ -112,7 +126,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
     setData(prev => ({
       ...prev,
       primaryGoal: goal,
-      targetWeight,
+      targetWeight: targetWeight,
       weeklyPace: pace,
     }));
   };
@@ -198,6 +212,13 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
     }));
   };
 
+  const setUnit = (unit: 'metric' | 'imperial') => {
+    setData(prev => ({
+      ...prev,
+      unit,
+    }));
+  };
+
   const saveOnboardingData = async () => {
     try {
       const { data: { user }, error: userError } = await supabase.auth.getUser();
@@ -219,7 +240,12 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
 
       if (profileError) throw profileError;
 
-      // Then save onboarding data
+      // Convert to metric if user input was in imperial
+      const height_cm = data.unit === 'metric' ? data.height : convertToMetric.height(data.height!);
+      const weight_kg = data.unit === 'metric' ? data.weight : convertToMetric.weight(data.weight!);
+      const target_weight_kg = data.unit === 'metric' ? data.targetWeight : convertToMetric.weight(data.targetWeight!);
+
+      // Save onboarding data (all in metric units)
       const { error: onboardingError } = await supabase
         .from('user_onboarding')
         .upsert({
@@ -228,10 +254,10 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
           gender: data.gender,
           birthday: data.birthday?.toISOString(),
           activity_level: data.activityLevel,
-          height_cm: data.height,
-          weight_kg: data.weight,
+          height_cm,
+          weight_kg,
           primary_goal: data.primaryGoal?.toLowerCase().replace(' ', '_'),
-          target_weight_kg: data.targetWeight,
+          target_weight_kg,
           weekly_pace: data.weeklyPace,
           protein_ratio: data.macros.protein,
           carbs_ratio: data.macros.carbs,
@@ -266,6 +292,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
         setMacros,
         calculateMacros,
         saveOnboardingData,
+        setUnit,
       }}
     >
       {children}

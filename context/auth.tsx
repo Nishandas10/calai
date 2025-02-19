@@ -55,7 +55,7 @@ function useProtectedRoute(session: Session | null) {
         if (profile?.onboarding_completed) {
           if (inAuthGroup || inOnboardingGroup) {
             console.log('Onboarding completed, redirecting to main app');
-            router.replace('/(tabs)');
+            router.replace('/(onboarding)/completed');
           }
         } else {
           if (inTabsGroup || inAuthGroup) {

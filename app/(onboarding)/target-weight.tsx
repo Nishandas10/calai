@@ -67,8 +67,14 @@ export default function TargetWeightScreen() {
   };
 
   const handleNext = () => {
-    setGoals('Lose weight', selectedWeight, 0.5);
-    router.push('/(onboarding)/weekly-pace');
+    if (selectedWeight) {
+      setGoals(
+        'Lose weight',
+        selectedWeight,
+        0
+      );
+      router.push('/(onboarding)/weekly-pace');
+    }
   };
 
   return (

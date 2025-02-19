@@ -19,7 +19,7 @@ const MAX_PACE = 1.5;
 const DEFAULT_PACE = 0.8;
 
 export default function WeeklyPaceScreen() {
-  const { setGoals } = useOnboarding();
+  const { setGoals, data } = useOnboarding();
   const [selectedPace, setSelectedPace] = useState(DEFAULT_PACE);
 
   // Animated values
@@ -53,7 +53,11 @@ export default function WeeklyPaceScreen() {
   });
 
   const handleNext = () => {
-    setGoals('Lose weight', null, selectedPace);
+    setGoals(
+      data.primaryGoal || 'Lose weight',
+      data.targetWeight,
+      selectedPace
+    );
     router.push('/(onboarding)/weekly-pace-info');
   };
 

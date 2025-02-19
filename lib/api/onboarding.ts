@@ -67,7 +67,7 @@ export const saveUserGoals = async (goals: UserGoals) => {
 };
 
 export const saveDietaryPreferences = async (
-  preferences: DietaryPreferences
+  preferences: DietaryPreferences,
 ) => {
   const {
     data: { session },
@@ -108,7 +108,7 @@ export const saveOnboardingData = async (
   healthMetrics: HealthMetrics,
   goals: UserGoals,
   dietaryPreferences: DietaryPreferences,
-  macroGoals: MacroGoals
+  macroGoals: MacroGoals,
 ) => {
   try {
     await saveHealthMetrics(healthMetrics);
