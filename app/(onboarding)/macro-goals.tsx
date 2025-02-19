@@ -145,13 +145,15 @@ export default function MacroGoalsScreen() {
       </Text>
 
       <View style={styles.footer}>
-        <Button 
+        <TouchableOpacity 
+          style={styles.nextButton}
           onPress={handleNext}
           disabled={loading}
-          style={styles.nextButton}
         >
-          {loading ? 'Calculating...' : 'Next'}
-        </Button>
+          <Text style={styles.nextButtonText}>
+            {loading ? 'Calculating...' : 'Next'}
+          </Text>
+        </TouchableOpacity>
       </View>
     </ScrollView>
   );
@@ -282,13 +284,19 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   footer: {
-    marginTop: 20,
-    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingBottom: 20,
   },
   nextButton: {
     backgroundColor: '#000',
-    paddingVertical: 14,
-    borderRadius: 25,
-    marginBottom: 16,
-  }
+    height: 56,
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  nextButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
 }); 

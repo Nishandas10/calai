@@ -9,7 +9,7 @@ import { OnboardingButton } from '@/components/onboarding/OnboardingButton';
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const PICKER_HEIGHT = SCREEN_HEIGHT * 0.4;
 
-const YEARS = Array.from({ length: 59 }, (_, i) => 1998 - i);
+const YEARS = Array.from({ length: 81 }, (_, i) => 2010 - i);
 const MONTHS = Array.from({ length: 12 }, (_, i) => i + 1);
 const DAYS = Array.from({ length: 31 }, (_, i) => i + 1);
 
@@ -18,6 +18,18 @@ export default function BirthdayScreen() {
   const [selectedYear, setSelectedYear] = useState(1998);
   const [selectedMonth, setSelectedMonth] = useState(1);
   const [selectedDay, setSelectedDay] = useState(1);
+  const yearScrollViewRef = React.useRef<ScrollView>(null);
+
+  React.useEffect(() => {
+    // Calculate scroll position for 1998
+    const yearIndex = YEARS.findIndex(year => year === 1998);
+    if (yearIndex !== -1 && yearScrollViewRef.current) {
+      yearScrollViewRef.current.scrollTo({
+        y: yearIndex * 48, // 44 (height) + 4 (margin)
+        animated: false
+      });
+    }
+  }, []);
 
   const handleNext = () => {
     setBirthday(new Date(selectedYear, selectedMonth - 1, selectedDay));
@@ -102,6 +114,7 @@ export default function BirthdayScreen() {
             <View style={styles.column}>
               <Text style={styles.columnLabel}>Year</Text>
               <ScrollView 
+                ref={yearScrollViewRef}
                 style={styles.scrollColumn}
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={styles.scrollContent}

@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Dimensions, ScrollView, SafeAreaView } from 'react-native';
 import { router } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import Svg, { Circle } from 'react-native-svg';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { useOnboarding } from '@/context/onboarding';
@@ -202,28 +202,37 @@ export default function CompletedScreen() {
     );
   };
 
-  const MacroIcon = ({ type }: { type: 'protein' | 'carbs' | 'fat' }) => {
+  const MacroIcon = ({ type }: { type: 'protein' | 'carbs' | 'fat' | 'calories' }) => {
     let iconName = '';
     let iconColor = '';
+    let bgColor = '';
 
     switch (type) {
+      case 'calories':
+        iconName = 'fire';
+        iconColor = '#000000';
+        bgColor = '#FFF5F5';
+        break;
       case 'protein':
-        iconName = 'barbell-outline';
+        iconName = 'food-turkey';
         iconColor = '#FF6B6B';
+        bgColor = '#FFF0F0';
         break;
       case 'carbs':
-        iconName = 'nutrition-outline';
+        iconName = 'barley';
         iconColor = '#4ECDC4';
+        bgColor = '#F0FAF9';
         break;
       case 'fat':
-        iconName = 'water-outline';
-        iconColor = '#FFD700';
+        iconName = 'cheese';
+        iconColor = '#FFB700';
+        bgColor = '#FFF9E6';
         break;
     }
 
     return (
-      <View style={styles.macroIconContainer}>
-        <Ionicons name={iconName as any} size={24} color={iconColor} />
+      <View style={[styles.macroIconContainer, { backgroundColor: bgColor }]}>
+        <MaterialCommunityIcons name={iconName as any} size={36} color={iconColor} />
       </View>
     );
   };
@@ -257,10 +266,12 @@ export default function CompletedScreen() {
 
           <Text style={styles.title}>Congratulations{'\n'}your custom plan is ready!</Text>
 
-          <View style={styles.targetSection}>
-            <Text style={styles.targetLabel}>You should Lose:</Text>
-            <Text style={styles.targetValue}>17.0 kg by July 01</Text>
-          </View>
+          {data.targetWeight && (
+            <View style={styles.targetSection}>
+              <Text style={styles.targetLabel}>Target Weight:</Text>
+              <Text style={styles.targetValue}>{data.targetWeight} {data.unit === 'metric' ? 'kg' : 'lb'}</Text>
+            </View>
+          )}
 
           <View style={styles.recommendationCard}>
             <View style={styles.recommendationHeader}>
@@ -271,10 +282,9 @@ export default function CompletedScreen() {
               {/* Calories Circle - Top Left */}
               <View style={styles.macroCard}>
                 {renderProgressCircle(0.85, '#000', 85, 'calories')}
-                <View style={styles.caloriesContent}>
-                  <Text style={styles.caloriesValue}>{dailyCalories}</Text>
-                  <Text style={styles.caloriesLabel}>kcal/day</Text>
-                </View>
+                <MacroIcon type="calories" />
+                <Text style={styles.macroValue}>{dailyCalories}</Text>
+                <Text style={styles.macroLabel}>kcal/day</Text>
               </View>
 
               {/* Carbs Circle - Top Right */}
@@ -316,7 +326,9 @@ export default function CompletedScreen() {
                 <Ionicons name="heart-half" size={20} color="#EF5350" />
                 <Text style={styles.healthScoreLabel}>Health score</Text>
               </View>
-              <Text style={styles.healthScoreValue}>7/10</Text>
+              <Text style={styles.healthScoreValue}>
+                {Math.round((proteinPercentage + carbsPercentage + fatPercentage) / 30)}/10
+              </Text>
             </View>
           </View>
         </Animated.View>
@@ -438,23 +450,25 @@ const styles = StyleSheet.create({
   },
   macroIconContainer: {
     position: 'absolute',
-    top: '50%',
-    left: '50%',
-    transform: [{ translateX: -12 }, { translateY: -12 }],
-    width: 24,
-    height: 24,
+    marginTop: 15,
+    top: (CIRCLE_SIZE - 60) / 2,
+    left: (CIRCLE_SIZE - 60) / 2,
+    right: (CIRCLE_SIZE - 60) / 2,
+    bottom: (CIRCLE_SIZE - 60) / 2,
+    width: 60,
+    height: 60,
     justifyContent: 'center',
     alignItems: 'center',
+    borderRadius: 30,
     backgroundColor: '#fff',
-    borderRadius: 12,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 2,
+      height: 4,
     },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 3,
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 5,
   },
   macroValue: {
     fontSize: 20,
