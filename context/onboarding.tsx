@@ -241,15 +241,15 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
         break;
 
       case 'Maintain':
-        protein = weight * 2.0;
-        fat = weight * 0.9;
-        carbs = (tdee - (protein * 4 + fat * 9)) / 4;
+        protein = weight * 1.8;  // Moderate-high protein (1.8g per kg bodyweight)
+        fat = weight * 0.8;      // Balanced fat intake
+        carbs = (tdee * 1.0 - (protein * 4 + fat * 9)) / 4; // Remaining calories from carbs (~45-50%)
         break;
 
       case 'Boost Energy':
-        protein = weight * 1.8; // Moderate protein
-        fat = weight * 0.8;     // Moderate fat
-        carbs = (tdee * 1.05 - (protein * 4 + fat * 9)) / 4; // Higher carbs for energy
+        protein = weight * 1.8;  // Moderate protein (1.6g per kg bodyweight)
+        fat = weight * 0.7;      // Lower end of healthy fat range
+        carbs = (tdee * 1.1 - (protein * 4 + fat * 9)) / 4; // Higher carbs (~55-60% of calories)
         break;
 
       case 'Improve Nutrition':
