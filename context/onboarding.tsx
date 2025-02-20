@@ -1,8 +1,6 @@
 import React, { createContext, useContext, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 
-type DietaryPreference = 'Vegetarian' | 'Vegan' | 'Gluten-free' | 'Dairy-free';
-type DietStyle = 'Keto' | 'Low-carb' | 'Mediterranean' | 'None';
 type Goal = string;
 
 interface OnboardingData {
@@ -20,16 +18,6 @@ interface OnboardingData {
   targetWeight: number | null;
   weeklyPace: number | null;
   
-  // Dietary Preferences
-  dietaryPreferences: DietaryPreference[];
-  dietStyle: DietStyle | null;
-  
-  // Macro Goals
-  macros: {
-    protein: number;
-    carbs: number;
-    fat: number;
-  };
   useAutoMacros: boolean;
 }
 
@@ -42,7 +30,6 @@ interface OnboardingContextType {
   setHeight: (height: number) => void;
   setWeight: (weight: number) => void;
   setGoals: (goal: Goal, targetWeight: number | null, pace: number) => void;
-  setDietaryPreferences: (preferences: DietaryPreference[], style: DietStyle) => void;
   setMacros: (protein: number, carbs: number, fat: number, useAuto: boolean) => void;
   calculateMacros: (weight: number, height: number, age: number, gender: string, activityLevel: number) => void;
   saveOnboardingData: () => Promise<void>;
@@ -60,13 +47,6 @@ const defaultOnboardingData: OnboardingData = {
   usersGoal: null,
   targetWeight: null,
   weeklyPace: null,
-  dietaryPreferences: [],
-  dietStyle: null,
-  macros: {
-    protein: 0,
-    carbs: 0,
-    fat: 0,
-  },
   useAutoMacros: false,
 };
 
@@ -177,18 +157,9 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
     });
   };
 
-  const setDietaryPreferences = (preferences: DietaryPreference[], style: DietStyle) => {
-    setData(prev => ({
-      ...prev,
-      dietaryPreferences: preferences,
-      dietStyle: style,
-    }));
-  };
-
   const setMacros = (protein: number, carbs: number, fat: number, useAuto: boolean) => {
     setData(prev => ({
       ...prev,
-      macros: { protein, carbs, fat },
       useAutoMacros: useAuto,
     }));
   };
@@ -215,66 +186,9 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
     };
     const tdee = bmr * activityMultipliers[activityLevel as keyof typeof activityMultipliers];
 
-    // Calculate macros based on goal
-    let protein = 0, carbs = 0, fat = 0;
-    const userGoal = data.usersGoal;
-
-    switch (userGoal) {
-      case 'Lose weight':
-        protein = weight * 2.2; // Higher protein for muscle preservation
-        fat = weight * 0.8;     // Moderate fat
-        carbs = (tdee * 0.8 - (protein * 4 + fat * 9)) / 4; // 20% deficit
-        break;
-
-      case 'Gain muscle':
-        protein = weight * 2.4; // High protein for muscle growth
-        fat = weight * 1.0;     // Moderate to high fat
-        carbs = (tdee * 1.1 - (protein * 4 + fat * 9)) / 4; // 10% surplus
-        break;
-
-      case 'Maintain':
-        protein = weight * 1.8;  // Moderate-high protein (1.8g per kg bodyweight)
-        fat = weight * 0.8;      // Balanced fat intake
-        carbs = (tdee * 1.0 - (protein * 4 + fat * 9)) / 4; // Remaining calories from carbs (~45-50%)
-        break;
-
-      case 'Boost Energy':
-        protein = weight * 1.8;  // Moderate protein (1.6g per kg bodyweight)
-        fat = weight * 0.7;      // Lower end of healthy fat range
-        carbs = (tdee * 1.1 - (protein * 4 + fat * 9)) / 4; // Higher carbs (~55-60% of calories)
-        break;
-
-      case 'Improve Nutrition':
-        protein = weight * 2.0;
-        fat = weight * 0.85;
-        carbs = (tdee - (protein * 4 + fat * 9)) / 4;
-        break;
-
-      case 'Gain Weight':
-        protein = weight * 2.0; // Moderate protein
-        fat = weight * 1.1;     // Higher fat
-        carbs = (tdee * 1.15 - (protein * 4 + fat * 9)) / 4; // 15% surplus
-        break;
-
-      default:
-        protein = weight * 2.0;
-        fat = weight * 0.9;
-        carbs = (tdee - (protein * 4 + fat * 9)) / 4;
-    }
-
-    // Ensure non-negative values and round to nearest whole number
-    protein = Math.max(0, Math.round(protein));
-    carbs = Math.max(0, Math.round(carbs));
-    fat = Math.max(0, Math.round(fat));
-
-    // Update state with calculated macros
+    // Update state with auto macros flag
     setData(prev => ({
       ...prev,
-      macros: {
-        protein,
-        carbs,
-        fat,
-      },
       useAutoMacros: true,
     }));
   };
@@ -310,9 +224,6 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
         users_goal: dbGoalValue,
         target_weight_kg: data.unit === 'metric' ? data.targetWeight : convertToMetric.weight(data.targetWeight!),
         weekly_pace: data.weeklyPace,
-        protein_ratio: data.macros.protein,
-        carbs_ratio: data.macros.carbs,
-        fat_ratio: data.macros.fat,
         use_auto_macros: data.useAutoMacros,
         onboarding_completed: true,
         updated_at: new Date().toISOString(),
@@ -350,7 +261,6 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
         setHeight,
         setWeight,
         setGoals,
-        setDietaryPreferences,
         setMacros,
         calculateMacros,
         saveOnboardingData,

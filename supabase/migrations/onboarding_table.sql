@@ -2,7 +2,7 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- Create custom type for valid goals
-CREATE TYPE user_goal AS ENUM (
+CREATE TYPE users_goal AS ENUM (
     'lose_weight', 'gain_muscle', 'maintain',
     'boost_energy', 'improve_nutrition', 'gain_weight'
 );
@@ -25,10 +25,7 @@ CREATE TABLE IF NOT EXISTS public.user_onboarding (
     target_weight_kg DECIMAL(5,2),
     weekly_pace DECIMAL(3,1) CHECK (weekly_pace BETWEEN 0.1 AND 1.5),
     
-    -- Macro Goals
-    protein_ratio INTEGER,
-    carbs_ratio INTEGER,
-    fat_ratio INTEGER,
+    -- Preferences
     use_auto_macros BOOLEAN DEFAULT true,
     
     -- Metadata
@@ -42,9 +39,7 @@ CREATE TABLE IF NOT EXISTS public.user_onboarding (
         REFERENCES auth.users(id)
         ON DELETE CASCADE,
     CONSTRAINT unique_user_onboarding
-        UNIQUE(user_id),
-    CONSTRAINT macro_ratios_check
-        CHECK ((protein_ratio + carbs_ratio + fat_ratio) = 100 OR use_auto_macros = true)
+        UNIQUE(user_id)
 );
 
 -- Create updated_at trigger function if it doesn't exist
