@@ -1,6 +1,12 @@
 -- Enable UUID extension if not already enabled
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
+-- Create custom type for valid goals
+CREATE TYPE user_goal AS ENUM (
+    'lose_weight', 'gain_muscle', 'maintain',
+    'boost_energy', 'improve_nutrition', 'gain_weight'
+);
+
 -- Create onboarding table
 CREATE TABLE IF NOT EXISTS public.user_onboarding (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -14,17 +20,8 @@ CREATE TABLE IF NOT EXISTS public.user_onboarding (
     height_cm DECIMAL(5,2) NOT NULL,
     weight_kg DECIMAL(5,2) NOT NULL,
     
-    -- Goals
-    users_goal VARCHAR(50) CHECK (
-        users_goal IN (
-            'lose_weight',
-            'gain_muscle',
-            'maintain',
-            'boost_energy',
-            'improve_nutrition',
-            'gain_weight'
-        )
-    ),
+    -- Goals (using text to store formatted goals with scores)
+    users_goal TEXT NOT NULL,
     target_weight_kg DECIMAL(5,2),
     weekly_pace DECIMAL(3,1) CHECK (weekly_pace BETWEEN 0.1 AND 1.5),
     
@@ -45,7 +42,9 @@ CREATE TABLE IF NOT EXISTS public.user_onboarding (
         REFERENCES auth.users(id)
         ON DELETE CASCADE,
     CONSTRAINT unique_user_onboarding
-        UNIQUE(user_id)
+        UNIQUE(user_id),
+    CONSTRAINT macro_ratios_check
+        CHECK ((protein_ratio + carbs_ratio + fat_ratio) = 100 OR use_auto_macros = true)
 );
 
 -- Create updated_at trigger function if it doesn't exist
@@ -69,4 +68,4 @@ CREATE INDEX IF NOT EXISTS idx_user_onboarding_user_id ON public.user_onboarding
 CREATE INDEX IF NOT EXISTS idx_user_onboarding_created_at ON public.user_onboarding(created_at);
 
 -- Add table comment
-COMMENT ON TABLE public.user_onboarding IS 'Stores user onboarding data including personal info, goals, and macro preferences in both metric and imperial units'; 
+COMMENT ON TABLE public.user_onboarding IS 'Stores user onboarding data including personal info, goals, and macro preferences in both metric and imperial units';

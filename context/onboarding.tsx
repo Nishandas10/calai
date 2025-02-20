@@ -3,7 +3,7 @@ import { supabase } from '@/lib/supabase';
 
 type DietaryPreference = 'Vegetarian' | 'Vegan' | 'Gluten-free' | 'Dairy-free';
 type DietStyle = 'Keto' | 'Low-carb' | 'Mediterranean' | 'None';
-type Goal = 'Lose weight' | 'Maintain' | 'Gain muscle' | 'Boost Energy' | 'Improve Nutrition' | 'Gain Weight';
+type Goal = string;
 
 interface OnboardingData {
   // User Info
@@ -90,25 +90,8 @@ const goalToDbValue = (goal: Goal | null): string | null => {
   
   console.log('Converting goal to DB value:', goal);
   
-  // Direct mapping without switch
-  const goalMapping = {
-    'Lose weight': 'lose_weight',
-    'Gain muscle': 'gain_muscle',
-    'Maintain': 'maintain',
-    'Boost Energy': 'boost_energy',
-    'Improve Nutrition': 'improve_nutrition',
-    'Gain Weight': 'gain_weight'
-  } as const;
-
-  const dbValue = goalMapping[goal];
-  console.log('Mapped DB value:', dbValue);
-  
-  if (!dbValue) {
-    console.error('Invalid goal value:', goal);
-    return 'maintain';
-  }
-  
-  return dbValue;
+  // Return the goal string directly since we're now storing the full formatted string
+  return goal;
 };
 
 const OnboardingContext = createContext<OnboardingContextType | undefined>(undefined);
@@ -158,7 +141,6 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
       targetWeight,
       pace,
       goalType: typeof goal,
-      validGoal: ['Lose weight', 'Maintain', 'Gain muscle', 'Boost Energy', 'Improve Nutrition', 'Gain Weight'].includes(goal)
     });
 
     // Validate the goal value
@@ -167,19 +149,29 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
       return;
     }
 
-    // Log the exact goal string
+    // Parse and validate the goal string format
+    const goalsArray = goal.split(' , ').map(g => g.trim());
+    console.log('Parsed goals:', goalsArray);
+
+    if (goalsArray.length === 0) {
+      console.error('No valid goals found in the string');
+      return;
+    }
+
+    // Log the exact goal string for debugging
     console.log('Goal string:', JSON.stringify(goal));
     
     setData(prev => {
       const newData = {
         ...prev,
-        usersGoal: goal,
+        usersGoal: goal, // Store the full formatted string with scores
         targetWeight: targetWeight,
         weeklyPace: pace,
       };
       console.log('State after update:', {
         previousGoal: prev.usersGoal,
-        newGoal: newData.usersGoal
+        newGoal: newData.usersGoal,
+        goalsCount: goalsArray.length,
       });
       return newData;
     });

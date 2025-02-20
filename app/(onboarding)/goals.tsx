@@ -7,32 +7,41 @@ import { OnboardingProgress } from '@/components/onboarding/OnboardingProgress';
 import { OnboardingButton } from '@/components/onboarding/OnboardingButton';
 import { Ionicons } from '@expo/vector-icons';
 
-const GOALS = [
+type GoalId = 'lose_weight' | 'gain_muscle' | 'maintain' | 'boost_energy' | 'improve_nutrition' | 'gain_weight';
+
+interface Goal {
+  id: GoalId;
+  title: string;
+  icon: string;
+  priority: Record<GoalId, number>;
+}
+
+const GOALS: readonly Goal[] = [
   {
     id: 'lose_weight',
     title: 'Lose Weight',
     icon: '🔥',
     priority: {
       lose_weight: 5,
-      gain_muscle: 2,    // Very low - opposing goals
+      gain_muscle: 2,
       maintain: 2,
-      boost_energy: 2,   // Increased - energy important during deficit
-      improve_nutrition: 3, // Increased - crucial for healthy weight loss
-      gain_weight: 0     // Completely opposing
-    }
+      boost_energy: 2,
+      improve_nutrition: 3,
+      gain_weight: 0,
+    },
   },
   {
     id: 'gain_muscle',
     title: 'Gain Muscle',
     icon: '💪',
     priority: {
-      lose_weight: 2,    // Very low - opposing goals
+      lose_weight: 2,
       gain_muscle: 5,
-      maintain: 3,       // Increased - muscle maintenance is relevant
-      boost_energy: 4,   // Increased - needed for intense training
-      improve_nutrition: 4, // Increased - crucial for muscle growth
-      gain_weight: 3     // Decreased - controlled gain preferred
-    }
+      maintain: 3,
+      boost_energy: 4,
+      improve_nutrition: 4,
+      gain_weight: 3,
+    },
   },
   {
     id: 'maintain',
@@ -40,127 +49,190 @@ const GOALS = [
     icon: '⚖️',
     priority: {
       lose_weight: 2,
-      gain_muscle: 3,    // Increased - body recomposition possible
+      gain_muscle: 3,
       maintain: 5,
       boost_energy: 3,
-      improve_nutrition: 4, // Increased - key for maintenance
-      gain_weight: 2
-    }
+      improve_nutrition: 4,
+      gain_weight: 2,
+    },
   },
   {
     id: 'boost_energy',
     title: 'Boost Energy',
     icon: '⚡',
     priority: {
-      lose_weight: 3,    // Increased - energy important during deficit
-      gain_muscle: 4,    // Increased - synergistic goals
+      lose_weight: 3,
+      gain_muscle: 4,
       maintain: 3,
       boost_energy: 5,
-      improve_nutrition: 5, // Increased - directly impacts energy
-      gain_weight: 2
-    }
+      improve_nutrition: 5,
+      gain_weight: 2,
+    },
   },
   {
     id: 'improve_nutrition',
     title: 'Improve Nutrition',
     icon: '🥗',
     priority: {
-      lose_weight: 4,    // Increased - healthy weight loss
-      gain_muscle: 4,    // Increased - quality muscle gain
-      maintain: 4,       // Increased - healthy maintenance
-      boost_energy: 5,   // Increased - direct relationship
+      lose_weight: 4,
+      gain_muscle: 4,
+      maintain: 4,
+      boost_energy: 5,
       improve_nutrition: 5,
-      gain_weight: 3
-    }
+      gain_weight: 3,
+    },
   },
   {
     id: 'gain_weight',
     title: 'Gain Weight',
     icon: '🎯',
     priority: {
-      lose_weight: 0,    // Completely opposing
-      gain_muscle: 3,    // Decreased - controlled gain preferred
+      lose_weight: 0,
+      gain_muscle: 3,
       maintain: 2,
       boost_energy: 2,
       improve_nutrition: 3,
-      gain_weight: 5
-    }
+      gain_weight: 5,
+    },
   },
 ] as const;
 
-type GoalType = typeof GOALS[number]['id'];
+// Create a lookup map for easier access to goals by their id
+const goalsMap = GOALS.reduce((acc, goal) => {
+  acc[goal.id] = goal;
+  return acc;
+}, {} as Record<GoalId, Goal>);
 
-const calculatePrimaryGoal = (selectedGoals: GoalType[]): GoalType => {
-  // If only one goal is selected, return it
-  if (selectedGoals.length === 1) {
-    return selectedGoals[0];
+/**
+ * Determines the primary goal based on normalized pairwise scoring.
+ *
+ * For each selected goal:
+ *  - Compute rawScore: the sum of its priority values for the other selected goals.
+ *  - Compute maxPossible: the sum of its priority values for all other goals (excluding itself).
+ *  - Compute normalizedScore = rawScore / maxPossible.
+ * The goal with the highest normalized score is selected as the primary goal.
+ *
+ * @param selectedGoalIds An array of selected goal IDs.
+ * @returns The goal id that is determined to be the primary goal.
+ */
+function determinePrimaryGoalNormalized(selectedGoalIds: GoalId[]): GoalId {
+  if (selectedGoalIds.length === 0) {
+    throw new Error('At least one goal must be selected.');
   }
 
-  // Calculate priority scores for each possible goal
-  const priorityScores = GOALS.reduce((scores, goal) => {
-    scores[goal.id] = 0;
-    return scores;
-  }, {} as Record<GoalType, number>);
+  let primaryGoal: GoalId = selectedGoalIds[0];
+  let highestNormalizedScore = -Infinity;
 
-  // For each selected goal, add its priority scores
-  selectedGoals.forEach(selectedGoal => {
-    const goalData = GOALS.find(g => g.id === selectedGoal);
-    if (goalData) {
-      Object.entries(goalData.priority).forEach(([targetGoal, priority]) => {
-        priorityScores[targetGoal as GoalType] += priority;
-      });
+  for (const goalId of selectedGoalIds) {
+    const goal = goalsMap[goalId];
+
+    // Raw score: sum the priority values for each of the other selected goals
+    const rawScore = selectedGoalIds
+      .filter((otherId) => otherId !== goalId)
+      .reduce((sum, otherId) => sum + goal.priority[otherId], 0);
+
+    // Maximum possible score: sum the priority values for all other possible goals (excluding itself)
+    const maxPossible = (Object.keys(goal.priority) as GoalId[])
+      .filter((otherId) => otherId !== goalId)
+      .reduce((sum, otherId) => sum + goal.priority[otherId], 0);
+
+    const normalizedScore = maxPossible ? rawScore / maxPossible : 0;
+    console.log(`Goal: ${goalId}, Raw Score: ${rawScore}, Max Possible: ${maxPossible}, Normalized: ${normalizedScore.toFixed(3)}`);
+
+    if (normalizedScore > highestNormalizedScore) {
+      highestNormalizedScore = normalizedScore;
+      primaryGoal = goalId;
     }
-  });
-
-  // Find the goal with the highest priority score
-  let maxScore = -1;
-  let primaryGoal: GoalType = 'maintain';
-
-  Object.entries(priorityScores).forEach(([goal, score]) => {
-    if (score > maxScore) {
-      maxScore = score;
-      primaryGoal = goal as GoalType;
-    }
-  });
-
-  console.log('Priority scores:', priorityScores);
-  console.log('Selected primary goal:', primaryGoal);
+  }
 
   return primaryGoal;
-};
+}
 
 export default function GoalsScreen() {
   const { setGoals } = useOnboarding();
-  const [selectedGoals, setSelectedGoals] = useState<GoalType[]>([]);
+  const [selectedGoals, setSelectedGoals] = useState<GoalId[]>([]);
 
-  const toggleGoal = (goalId: GoalType) => {
+  const logPriorityScores = (goals: GoalId[]) => {
+    if (goals.length === 0) {
+      console.log('No goals selected');
+      return;
+    }
+
+    console.log('\n=== Priority Scores ===');
+    console.log('Selected Goals:', goals.join(', '));
+
+    goals.forEach(goalId => {
+      const goal = goalsMap[goalId];
+      console.log(`\n${goal.title} priorities:`);
+      Object.entries(goal.priority)
+        .filter(([id]) => goals.includes(id as GoalId))
+        .forEach(([id, score]) => {
+          console.log(`  → ${goalsMap[id as GoalId].title}: ${score}`);
+        });
+    });
+
+    if (goals.length > 1) {
+      const primaryGoal = determinePrimaryGoalNormalized(goals);
+      console.log('\nPrimary Goal:', goalsMap[primaryGoal].title);
+    }
+    console.log('==================\n');
+  };
+
+  const toggleGoal = (goalId: GoalId) => {
     setSelectedGoals(prev => {
+      let newGoals: GoalId[];
       if (prev.includes(goalId)) {
-        return prev.filter(id => id !== goalId);
+        newGoals = prev.filter(id => id !== goalId);
+      } else {
+        // Allow up to 3 goals
+        if (prev.length >= 3) {
+          return prev;
+        }
+        newGoals = [...prev, goalId];
       }
-      // Allow up to 3 goals
-      if (prev.length >= 3) {
-        return prev;
-      }
-      return [...prev, goalId];
+      
+      // Log priority scores after state update
+      logPriorityScores(newGoals);
+      return newGoals;
     });
   };
 
   const handleNext = () => {
     if (selectedGoals.length > 0) {
-      const primaryGoalId = calculatePrimaryGoal(selectedGoals);
-      
-      const goalMapping = {
-        'lose_weight': 'Lose weight',
-        'gain_muscle': 'Gain muscle',
-        'maintain': 'Maintain',
-        'boost_energy': 'Boost Energy',
-        'improve_nutrition': 'Improve Nutrition',
-        'gain_weight': 'Gain Weight'
-      } as const;
+      // Calculate normalized scores for all selected goals
+      const goalScores = selectedGoals.map(goalId => {
+        const goal = goalsMap[goalId];
+        const rawScore = selectedGoals
+          .filter((otherId) => otherId !== goalId)
+          .reduce((sum, otherId) => sum + goal.priority[otherId], 0);
 
-      const primaryGoal = goalMapping[primaryGoalId];
-      setGoals(primaryGoal, null, 0);
+        const maxPossible = (Object.keys(goal.priority) as GoalId[])
+          .filter((otherId) => otherId !== goalId)
+          .reduce((sum, otherId) => sum + goal.priority[otherId], 0);
+
+        const normalizedScore = maxPossible ? rawScore / maxPossible : 0;
+        
+        return {
+          id: goalId,
+          title: goalsMap[goalId].title,
+          rawScore,
+          maxPossible,
+          normalizedScore
+        };
+      });
+
+      // Sort goals by normalized score in descending order
+      goalScores.sort((a, b) => b.normalizedScore - a.normalizedScore);
+
+      // Format goals string with scores
+      const goalsString = goalScores
+        .map(g => `${g.title} (${(g.normalizedScore * 100).toFixed(1)}%)`)
+        .join(' , ');
+
+      console.log('Goals with scores:', goalScores);
+      
+      // Use the formatted string as the goal
+      setGoals(goalsString as any, null, 0);
       router.push('/(onboarding)/target-weight');
     }
   };
