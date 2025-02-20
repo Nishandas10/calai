@@ -1,18 +1,124 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Dimensions, ScrollView, SafeAreaView } from 'react-native';
-import { router } from 'expo-router';
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Dimensions, ScrollView, SafeAreaView, ActivityIndicator } from 'react-native';
+import { router, useRouter } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import Svg, { Circle } from 'react-native-svg';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { useOnboarding } from '@/context/onboarding';
+import { supabase } from '@/lib/supabase';
+import { theme } from '@/constants/theme';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const CIRCLE_SIZE = (SCREEN_WIDTH - 100) / 2; // Slightly smaller circles
 const CIRCLE_RADIUS = (CIRCLE_SIZE - 32) / 2; // Adjusted radius
 const CIRCLE_LENGTH = 2 * Math.PI * CIRCLE_RADIUS;
 
+interface MacroRecommendations {
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+}
+
 export default function CompletedScreen() {
   const { data } = useOnboarding();
+  const router = useRouter();
+  const [loading, setLoading] = useState(false);
+  const [aiRecommendations, setAiRecommendations] = useState<MacroRecommendations | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchAiRecommendations();
+  }, []);
+
+  const fetchAiRecommendations = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('No session found');
+
+      console.log('Sending request with data:', data);
+      
+      const response = await fetch(`${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/analyze-macros`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ userData: data }),
+      });
+
+      const responseData = await response.json();
+      
+      if (!response.ok) {
+        console.error('Error response:', responseData);
+        throw new Error(responseData.error || 'Failed to fetch AI recommendations');
+      }
+
+      console.log('AI recommendations:', responseData);
+      setAiRecommendations(responseData);
+    } catch (err: any) {
+      const errorMessage = err.message || 'Unknown error occurred';
+      console.error('Error details:', err);
+      setError(`Error: ${errorMessage}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const calculateManualMacros = () => {
+    if (!data.weight || !data.height || !data.birthday || !data.gender || !data.activityLevel) {
+      return null;
+    }
+
+    // Calculate age
+    const birthDate = new Date(data.birthday);
+    const today = new Date();
+    const age = today.getFullYear() - birthDate.getFullYear();
+
+    // Calculate BMR using Mifflin-St Jeor formula
+    const bmr = data.gender === 'male'
+      ? 10 * data.weight + 6.25 * data.height - 5 * age + 5
+      : 10 * data.weight + 6.25 * data.height - 5 * age - 161;
+
+    // Activity multipliers
+    const activityMultipliers = {
+      1: 1.2,  // Sedentary
+      2: 1.375,  // Lightly active
+      3: 1.55,  // Moderately active
+      4: 1.725,  // Very active
+      5: 1.9,  // Super active
+    };
+
+    // Calculate TDEE
+    const tdee = bmr * activityMultipliers[data.activityLevel as keyof typeof activityMultipliers];
+
+    // Calculate macros based on standard ratios
+    return {
+      calories: Math.round(tdee),
+      protein: Math.round((tdee * 0.3) / 4), // 30% protein
+      carbs: Math.round((tdee * 0.4) / 4),   // 40% carbs
+      fat: Math.round((tdee * 0.3) / 9),     // 30% fat
+    };
+  };
+
+  const manualMacros = calculateManualMacros();
+
+  const MacroDisplay = ({ title, macros }: { title: string, macros: MacroRecommendations | null }) => {
+    if (!macros) return null;
+
+    return (
+      <View style={styles.macroContainer}>
+        <Text style={styles.macroTitle}>{title}</Text>
+        <Text style={styles.macroText}>Calories: {macros.calories} kcal</Text>
+        <Text style={styles.macroText}>Protein: {macros.protein}g</Text>
+        <Text style={styles.macroText}>Carbs: {macros.carbs}g</Text>
+        <Text style={styles.macroText}>Fat: {macros.fat}g</Text>
+      </View>
+    );
+  };
   
   // Calculate TDEE and macros
   const calculateDailyCalories = () => {
@@ -179,27 +285,27 @@ export default function CompletedScreen() {
 
     return (
       <Svg width={CIRCLE_SIZE} height={CIRCLE_SIZE}>
-        <Circle
+      <Circle
           cx={CIRCLE_SIZE / 2}
           cy={CIRCLE_SIZE / 2}
           r={(CIRCLE_SIZE - 10) / 2}
-          stroke="#E8E8E8"
-          strokeWidth={8}
-          fill="none"
-        />
-        <Circle
+        stroke="#E8E8E8"
+        strokeWidth={8}
+        fill="none"
+      />
+      <Circle
           cx={CIRCLE_SIZE / 2}
           cy={CIRCLE_SIZE / 2}
           r={(CIRCLE_SIZE - 10) / 2}
-          stroke={color}
-          strokeWidth={8}
+        stroke={color}
+        strokeWidth={8}
           strokeDasharray={`${progress * CIRCLE_SIZE * Math.PI} ${CIRCLE_SIZE * Math.PI}`}
-          strokeLinecap="round"
-          fill="none"
+        strokeLinecap="round"
+        fill="none"
           transform={`rotate(-90 ${CIRCLE_SIZE / 2} ${CIRCLE_SIZE / 2})`}
-        />
-      </Svg>
-    );
+      />
+    </Svg>
+  );
   };
 
   const MacroIcon = ({ type }: { type: 'protein' | 'carbs' | 'fat' | 'calories' }) => {
@@ -267,10 +373,10 @@ export default function CompletedScreen() {
           <Text style={styles.title}>Congratulations{'\n'}your custom plan is ready!</Text>
 
           {data.targetWeight && (
-            <View style={styles.targetSection}>
+          <View style={styles.targetSection}>
               <Text style={styles.targetLabel}>Target Weight:</Text>
               <Text style={styles.targetValue}>{data.targetWeight} {data.unit === 'metric' ? 'kg' : 'lb'}</Text>
-            </View>
+          </View>
           )}
 
           <View style={styles.recommendationCard}>
@@ -331,6 +437,17 @@ export default function CompletedScreen() {
               </Text>
             </View>
           </View>
+
+          {loading ? (
+            <ActivityIndicator size="large" color={theme.colors.primary} style={styles.loadingIndicator} />
+          ) : error ? (
+            <Text style={styles.error}>{error}</Text>
+          ) : (
+            <>
+              <MacroDisplay title="AI Recommendations" macros={aiRecommendations} />
+              <MacroDisplay title="Standard Calculations" macros={manualMacros} />
+            </>
+          )}
         </Animated.View>
       </ScrollView>
 
@@ -544,5 +661,30 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     marginTop: 4,
+  },
+  loadingIndicator: {
+    marginTop: 20,
+  },
+  error: {
+    color: theme.colors.error,
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  macroContainer: {
+    backgroundColor: theme.colors.background,
+    padding: 20,
+    borderRadius: 10,
+    marginBottom: 20,
+  },
+  macroTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: theme.colors.primary,
+    marginBottom: 10,
+  },
+  macroText: {
+    fontSize: 16,
+    color: theme.colors.text,
+    marginBottom: 5,
   },
 }); 

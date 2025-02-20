@@ -1,0 +1,9 @@
+[global]
+runtime = "deno"
+
+[deploy]
+allowed_imports = [
+    "https://deno.land/std/*",
+    "https://esm.sh/*",
+    "https://esm.sh/openai@4.28.0"
+] 
