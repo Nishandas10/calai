@@ -25,7 +25,10 @@ CREATE TABLE IF NOT EXISTS public.user_onboarding (
     target_weight_kg DECIMAL(5,2),
     weekly_pace DECIMAL(3,1) CHECK (weekly_pace BETWEEN 0.1 AND 1.5),
     
-    -- Preferences
+    -- Macro Goals
+    protein_ratio INTEGER,
+    carbs_ratio INTEGER,
+    fat_ratio INTEGER,
     use_auto_macros BOOLEAN DEFAULT true,
     
     -- Metadata
@@ -39,7 +42,9 @@ CREATE TABLE IF NOT EXISTS public.user_onboarding (
         REFERENCES auth.users(id)
         ON DELETE CASCADE,
     CONSTRAINT unique_user_onboarding
-        UNIQUE(user_id)
+        UNIQUE(user_id),
+    CONSTRAINT macro_ratios_check
+        CHECK ((protein_ratio + carbs_ratio + fat_ratio) = 100 OR use_auto_macros = true)
 );
 
 -- Create updated_at trigger function if it doesn't exist
