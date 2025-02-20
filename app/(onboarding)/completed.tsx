@@ -68,43 +68,43 @@ export default function CompletedScreen() {
     }
   };
 
-  const calculateManualMacros = () => {
-    if (!data.weight || !data.height || !data.birthday || !data.gender || !data.activityLevel) {
-      return null;
-    }
+  // const calculateManualMacros = () => {
+  //   if (!data.weight || !data.height || !data.birthday || !data.gender || !data.activityLevel) {
+  //     return null;
+  //   }
 
-    // Calculate age
-    const birthDate = new Date(data.birthday);
-    const today = new Date();
-    const age = today.getFullYear() - birthDate.getFullYear();
+  //   // Calculate age
+  //   const birthDate = new Date(data.birthday);
+  //   const today = new Date();
+  //   const age = today.getFullYear() - birthDate.getFullYear();
 
-    // Calculate BMR using Mifflin-St Jeor formula
-    const bmr = data.gender === 'male'
-      ? 10 * data.weight + 6.25 * data.height - 5 * age + 5
-      : 10 * data.weight + 6.25 * data.height - 5 * age - 161;
+  //   // Calculate BMR using Mifflin-St Jeor formula
+  //   const bmr = data.gender === 'male'
+  //     ? 10 * data.weight + 6.25 * data.height - 5 * age + 5
+  //     : 10 * data.weight + 6.25 * data.height - 5 * age - 161;
 
-    // Activity multipliers
-    const activityMultipliers = {
-      1: 1.2,  // Sedentary
-      2: 1.375,  // Lightly active
-      3: 1.55,  // Moderately active
-      4: 1.725,  // Very active
-      5: 1.9,  // Super active
-    };
+  //   // Activity multipliers
+  //   const activityMultipliers = {
+  //     1: 1.2,  // Sedentary
+  //     2: 1.375,  // Lightly active
+  //     3: 1.55,  // Moderately active
+  //     4: 1.725,  // Very active
+  //     5: 1.9,  // Super active
+  //   };
 
-    // Calculate TDEE
-    const tdee = bmr * activityMultipliers[data.activityLevel as keyof typeof activityMultipliers];
+  //   // Calculate TDEE
+  //   const tdee = bmr * activityMultipliers[data.activityLevel as keyof typeof activityMultipliers];
 
-    // Calculate macros based on standard ratios
-    return {
-      calories: Math.round(tdee),
-      protein: Math.round((tdee * 0.3) / 4), // 30% protein
-      carbs: Math.round((tdee * 0.4) / 4),   // 40% carbs
-      fat: Math.round((tdee * 0.3) / 9),     // 30% fat
-    };
-  };
+  //   // Calculate macros based on standard ratios
+  //   return {
+  //     calories: Math.round(tdee),
+  //     protein: Math.round((tdee * 0.3) / 4), // 30% protein
+  //     carbs: Math.round((tdee * 0.4) / 4),   // 40% carbs
+  //     fat: Math.round((tdee * 0.3) / 9),     // 30% fat
+  //   };
+  // };
 
-  const manualMacros = calculateManualMacros();
+  // const manualMacros = calculateManualMacros();
 
   const MacroDisplay = ({ title, macros }: { title: string, macros: MacroRecommendations | null }) => {
     if (!macros) return null;
@@ -229,6 +229,7 @@ export default function CompletedScreen() {
 
   const { calories: dailyCalories, macros } = calculateDailyCalories();
   const { protein: proteinGrams, carbs: carbsGrams, fat: fatGrams } = macros;
+  const manualMacro = calculateDailyCalories();
 
   // Add safety checks for macro calculations
   const totalCalories = dailyCalories || 2000; // Fallback to 2000 if undefined
@@ -445,7 +446,15 @@ export default function CompletedScreen() {
           ) : (
             <>
               <MacroDisplay title="AI Recommendations" macros={aiRecommendations} />
-              <MacroDisplay title="Standard Calculations" macros={manualMacros} />
+              <MacroDisplay 
+                title="Standard Calculations" 
+                macros={{
+                  calories: dailyCalories,
+                  protein: proteinGrams,
+                  carbs: carbsGrams,
+                  fat: fatGrams
+                }} 
+              />
             </>
           )}
         </Animated.View>

@@ -22,6 +22,14 @@ interface UserData {
     weight: number;
 }
 
+function cleanJsonResponse(response: string): string {
+    // Remove markdown code block syntax if present
+    response = response.replace(/```json\n?/g, "").replace(/```\n?/g, "");
+    // Remove any leading/trailing whitespace
+    response = response.trim();
+    return response;
+}
+
 serve(async (req) => {
     if (req.method === "OPTIONS") {
         return new Response("ok", { headers: corsHeaders });
@@ -72,24 +80,23 @@ User Profile:
 - Goals: ${userData.usersGoal}
 - Weekly Weight Change Pace: ${userData.weeklyPace} kg/week
 
-Please provide:
-1. Daily calorie target
-2. Recommended macronutrient distribution in grams:
-   - Protein (g)
-   - Carbohydrates (g)
-   - Fat (g)
-
-Format your response as a JSON object with these exact keys: calories, protein, carbs, fat`;
+Provide a JSON object with these exact keys and numeric values only:
+{
+  "calories": number,
+  "protein": number,
+  "carbs": number,
+  "fat": number
+}`;
 
         // Call OpenAI API
         console.log("Calling OpenAI API with prompt:", prompt);
         const completion = await openai.chat.completions.create({
-            model: "gpt-4o-mini",
+            model: "gpt-4",
             messages: [
                 {
                     role: "system",
                     content:
-                        "You are a certified nutrition expert. Provide evidence-based nutrition recommendations. Respond only with the requested JSON format.",
+                        "You are a certified nutrition expert. Provide evidence-based nutrition recommendations. Respond ONLY with a valid JSON object, no markdown or additional text.",
                 },
                 {
                     role: "user",
@@ -105,20 +112,36 @@ Format your response as a JSON object with these exact keys: calories, protein, 
             throw new Error("No response from OpenAI");
         }
 
-        // Parse the JSON response
-        console.log("Parsing response:", response);
-        const macros = JSON.parse(response);
-        console.log("Final macros:", macros);
+        // Clean and parse the JSON response
+        console.log("Raw response:", response);
+        const cleanedResponse = cleanJsonResponse(response);
+        console.log("Cleaned response:", cleanedResponse);
 
-        return new Response(
-            JSON.stringify(macros),
-            {
-                headers: {
-                    ...corsHeaders,
-                    "Content-Type": "application/json",
+        try {
+            const macros = JSON.parse(cleanedResponse);
+            console.log("Final macros:", macros);
+
+            // Validate the response structure
+            if (
+                !macros.calories || !macros.protein || !macros.carbs ||
+                !macros.fat
+            ) {
+                throw new Error("Invalid response format from OpenAI");
+            }
+
+            return new Response(
+                JSON.stringify(macros),
+                {
+                    headers: {
+                        ...corsHeaders,
+                        "Content-Type": "application/json",
+                    },
                 },
-            },
-        );
+            );
+        } catch (parseError) {
+            console.error("JSON parsing error:", parseError);
+            throw new Error("Failed to parse OpenAI response");
+        }
     } catch (error: any) {
         console.error("Error in analyze-macros function:", error);
         return new Response(
