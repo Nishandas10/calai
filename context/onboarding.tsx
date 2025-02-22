@@ -19,6 +19,20 @@ interface OnboardingData {
   weeklyPace: number | null;
   
   useAutoMacros: boolean;
+  
+  // Macros recommendations
+  aiMacros?: {
+    calories: number;
+    protein: number;
+    carbs: number;
+    fat: number;
+  };
+  standardMacros?: {
+    calories: number;
+    protein: number;
+    carbs: number;
+    fat: number;
+  };
 }
 
 interface OnboardingContextType {
@@ -32,7 +46,7 @@ interface OnboardingContextType {
   setGoals: (goal: Goal, targetWeight: number | null, pace: number) => void;
   setMacros: (protein: number, carbs: number, fat: number, useAuto: boolean) => void;
   calculateMacros: (weight: number, height: number, age: number, gender: string, activityLevel: number) => void;
-  saveOnboardingData: () => Promise<void>;
+  saveOnboardingData: (aiMacros?: OnboardingData['aiMacros'], standardMacros?: OnboardingData['standardMacros']) => Promise<void>;
   setUnit: (unit: 'metric' | 'imperial') => void;
 }
 
@@ -48,6 +62,8 @@ const defaultOnboardingData: OnboardingData = {
   targetWeight: null,
   weeklyPace: null,
   useAutoMacros: false,
+  aiMacros: undefined,
+  standardMacros: undefined,
 };
 
 // Unit conversion functions
@@ -200,7 +216,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
     }));
   };
 
-  const saveOnboardingData = async () => {
+  const saveOnboardingData = async (aiMacros?: OnboardingData['aiMacros'], standardMacros?: OnboardingData['standardMacros']) => {
     try {
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       if (userError) throw userError;
@@ -227,6 +243,17 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
         use_auto_macros: data.useAutoMacros,
         onboarding_completed: true,
         updated_at: new Date().toISOString(),
+        
+        // Add macros data
+        ai_calories: aiMacros?.calories,
+        ai_protein: aiMacros?.protein,
+        ai_carbs: aiMacros?.carbs,
+        ai_fat: aiMacros?.fat,
+        
+        standard_calories: standardMacros?.calories,
+        standard_protein: standardMacros?.protein,
+        standard_carbs: standardMacros?.carbs,
+        standard_fat: standardMacros?.fat,
       };
 
       console.log('Final data being saved:', onboardingData);
