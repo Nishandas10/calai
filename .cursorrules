@@ -2,6 +2,8 @@
 
 Always start with "Hi Bro"
 
+When using composer search the entire codebase , each folder and file for the answer.
+
 // React Native Expo best practices
 
 const reactNativeExpoBestPractices = [

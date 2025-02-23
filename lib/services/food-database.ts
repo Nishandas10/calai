@@ -1,4 +1,15 @@
-import { supabase } from "@/lib/supabase";
+import { firestore } from "@/lib/firebase";
+import {
+    addDoc,
+    collection,
+    doc,
+    getDocs,
+    query,
+    serverTimestamp,
+    setDoc,
+    where,
+} from "firebase/firestore";
+import { auth } from "@/lib/firebase";
 import axios from "axios";
 
 const OPENFOODFACTS_API = "https://world.openfoodfacts.org/api/v0";
@@ -106,29 +117,25 @@ function mapNutriscore(grade: string | null | undefined): string {
 type NutrimentKey = keyof ProductData["product"]["nutriments"];
 
 export async function saveProductToDatabase(productData: ProductData) {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = auth.currentUser;
     if (!user) throw new Error("Not authenticated");
 
     try {
-        // Validate product data
         if (!productData?.product) {
             throw new Error("Invalid product data structure");
         }
 
         const product = productData.product;
 
-        // Check for required fields
         if (!product.product_name) {
             throw new Error("Missing product name");
         }
 
-        // Safely get nutriment values with fallbacks
         const getNutrimentValue = (nutriment: NutrimentKey): number => {
             const value = product.nutriments?.[nutriment];
             return typeof value === "number" && !isNaN(value) ? value : 0;
         };
 
-        // Create nutrition data in the format expected by FoodAnalysisCard
         const nutritionData = {
             ingredients: [{
                 name: product.product_name || "Unknown Product",
@@ -169,43 +176,39 @@ export async function saveProductToDatabase(productData: ProductData) {
             },
         };
 
-        // Save basic product info with mapped nutriscore
-        const { data: savedProduct, error: productError } = await supabase
-            .from("scanned_products")
-            .upsert(
-                {
-                    user_id: user.id,
-                    barcode: productData.code,
-                    product_name: product.product_name,
-                    brand_name: product.brands || null,
-                    image_url: product.image_url || null,
-                    serving_size: product.serving_size || null,
-                    serving_quantity:
-                        typeof product.serving_quantity === "number"
-                            ? product.serving_quantity
-                            : null,
-                    nutriscore: mapNutriscore(product.nutriscore_grade),
-                    updated_at: new Date().toISOString(),
-                },
-                {
-                    onConflict: "user_id,barcode",
-                },
-            )
-            .select()
-            .single();
+        // Create a document reference with a composite key
+        const productDocRef = doc(
+            firestore,
+            "scanned_products",
+            `${user.uid}_${productData.code}`,
+        );
 
-        if (productError) {
-            console.error("Error saving product info:", productError);
-            throw productError;
-        }
+        // Save product data
+        await setDoc(productDocRef, {
+            userId: user.uid,
+            barcode: productData.code,
+            product_name: product.product_name,
+            brand_name: product.brands || null,
+            image_url: product.image_url || null,
+            serving_size: product.serving_size || null,
+            serving_quantity: typeof product.serving_quantity === "number"
+                ? product.serving_quantity
+                : null,
+            nutriscore: mapNutriscore(product.nutriscore_grade),
+            nutrition: nutritionData,
+            updated_at: serverTimestamp(),
+        }, { merge: true });
 
-        if (!savedProduct) {
-            throw new Error("Failed to save product info");
-        }
-
-        // Return data in the format expected by FoodAnalysisCard
+        // Return the saved data
         return {
-            ...savedProduct,
+            userId: user.uid,
+            barcode: productData.code,
+            product_name: product.product_name,
+            brand_name: product.brands || null,
+            image_url: product.image_url || null,
+            serving_size: product.serving_size || null,
+            serving_quantity: product.serving_quantity || null,
+            nutriscore: mapNutriscore(product.nutriscore_grade),
             analysis: nutritionData,
         };
     } catch (error) {
@@ -213,3 +216,5 @@ export async function saveProductToDatabase(productData: ProductData) {
         throw error;
     }
 }
+
+// Add your Firebase food database functions here

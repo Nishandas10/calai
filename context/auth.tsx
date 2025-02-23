@@ -1,21 +1,26 @@
-import { Session } from '@supabase/supabase-js';
-import { router, useSegments, useRootNavigationState } from 'expo-router';
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { User } from 'firebase/auth';
+import { signInWithEmail, signUpWithEmail, signOut, getCurrentUser, createUserProfile, AuthResponse, UserProfile } from '../lib/auth-helpers';
+import { router, useSegments, useRootNavigationState } from 'expo-router';
 import { Alert } from 'react-native';
 
-type AuthContextType = {
-  session: Session | null;
-  isLoading: boolean;
-  signUp: (email: string, password: string) => Promise<void>;
+interface AuthState {
+  user: User | null;
+  profile: UserProfile | null;
+  loading: boolean;
+}
+
+interface AuthContextType extends AuthState {
+  signUp: (email: string, password: string, fullName: string) => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
-  signOut: () => Promise<void>;
-};
+  logout: () => Promise<void>;
+  getCurrentUser: () => Promise<AuthResponse>;
+}
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 // This hook will protect the route access based on user authentication
-function useProtectedRoute(session: Session | null) {
+function useProtectedRoute(user: User | null) {
   const segments = useSegments();
   const navigationState = useRootNavigationState();
 
@@ -24,264 +29,124 @@ function useProtectedRoute(session: Session | null) {
 
     const inAuthGroup = segments[0] === '(auth)';
     const inOnboardingGroup = segments[0] === '(onboarding)';
-    const inTabsGroup = segments[0] === '(tabs)';
-    
-    console.log('Current route:', { segments, inAuthGroup, hasSession: !!session });
 
-    async function checkAuthAndOnboarding() {
+    async function checkOnboarding() {
       try {
-        // If no session, redirect to sign in unless already in auth group
-        if (!session) {
+        if (!user) {
+          // If the user is not signed in and the initial segment is not in the auth group
           if (!inAuthGroup) {
-            console.log('No session, redirecting to sign-in');
             router.replace('/(auth)/sign-in');
           }
           return;
         }
 
-        // If we have a session, check onboarding status
-        const { data: profile, error } = await supabase
-          .from('user_profiles')
-          .select('onboarding_completed')
-          .eq('id', session.user.id)
-          .single();
+        // If we have a user, check onboarding status
+        const userData = await getCurrentUser();
+        const onboardingCompleted = userData?.profile?.onboarding?.onboardingCompleted;
 
-        if (error) {
-          console.error('Error checking profile:', error);
-          return;
-        }
-
-        // Handle navigation based on onboarding status
-        if (profile?.onboarding_completed) {
-          if (inAuthGroup || inOnboardingGroup) {
-            console.log('Onboarding completed, redirecting to main app');
-            router.replace('/(onboarding)/completed');
-          }
-        } else {
-          if (inTabsGroup || inAuthGroup) {
-            console.log('Onboarding not completed, redirecting to onboarding');
-            router.replace('/(onboarding)/name');
-          }
+        if (user && !onboardingCompleted && !inOnboardingGroup) {
+          router.replace('/(onboarding)/name');
+        } else if (user && onboardingCompleted && (inAuthGroup || inOnboardingGroup)) {
+          router.replace('/(tabs)');
         }
       } catch (error) {
-        console.error('Error in checkAuthAndOnboarding:', error);
+        console.error('Error in protected route:', error);
       }
     }
 
-    checkAuthAndOnboarding();
-  }, [session, segments, navigationState?.key]);
+    checkOnboarding();
+  }, [user, segments, navigationState?.key]);
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [session, setSession] = useState<Session | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [state, setState] = useState<AuthState>({
+    user: null,
+    profile: null,
+    loading: true,
+  });
 
-  useProtectedRoute(session);
+  useProtectedRoute(state.user);
 
   useEffect(() => {
-    let mounted = true;
-
-    async function getInitialSession() {
-      try {
-        setIsLoading(true);
-        const { data: { session: initialSession }, error } = await supabase.auth.getSession();
-        
-        if (error) {
-          throw error;
-        }
-
-        if (mounted) {
-          if (initialSession) {
-            // Ensure user profile exists
-            const { data: profile, error: profileError } = await supabase
-              .from('user_profiles')
-              .select('id, onboarding_completed')
-              .eq('id', initialSession.user.id)
-              .single();
-
-            if (profileError && profileError.code !== 'PGRST116') {
-              console.error('Error checking profile:', profileError);
-            }
-
-            // If no profile exists, create one
-            if (!profile) {
-              const { error: createError } = await supabase
-                .from('user_profiles')
-                .insert({
-                  id: initialSession.user.id,
-                  email: initialSession.user.email,
-                  created_at: new Date().toISOString(),
-                  updated_at: new Date().toISOString(),
-                  onboarding_completed: false
-                });
-
-              if (createError) {
-                console.error('Error creating profile:', createError);
-              }
-            }
-
-            setSession(initialSession);
-          } else {
-            setSession(null);
-          }
-          setIsLoading(false);
-        }
-      } catch (error) {
-        console.error('Error getting initial session:', error);
-        if (mounted) {
-          setSession(null);
-          setIsLoading(false);
-        }
-      }
-    }
-
-    getInitialSession();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
-      console.log('Auth event:', event);
-      if (mounted && currentSession) {
-        // Ensure user profile exists on auth state change
-        const { data: profile, error: profileError } = await supabase
-          .from('user_profiles')
-          .select('id')
-          .eq('id', currentSession.user.id)
-          .single();
-
-        if (profileError && profileError.code !== 'PGRST116') {
-          console.error('Error checking profile:', profileError);
-        }
-
-        // If no profile exists, create one
-        if (!profile) {
-          const { error: createError } = await supabase
-            .from('user_profiles')
-            .insert({
-              id: currentSession.user.id,
-              email: currentSession.user.email,
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString()
-            });
-
-          if (createError) {
-            console.error('Error creating profile:', createError);
-          }
-        }
-
-        setSession(currentSession);
-      }
-    });
-
-    return () => {
-      mounted = false;
-      subscription.unsubscribe();
-    };
+    checkUser();
   }, []);
 
-  const signUp = async (email: string, password: string) => {
+  async function checkUser() {
     try {
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          emailRedirectTo: 'calai://',
-        },
+      const data = await getCurrentUser();
+      setState({
+        user: data?.user || null,
+        profile: data?.profile || null,
+        loading: false,
       });
-      
-      if (error) throw error;
+    } catch (error) {
+      console.error('Error checking user:', error);
+      setState({ user: null, profile: null, loading: false });
+    }
+  }
 
-      if (data?.user) {
-        Alert.alert(
-          'Check your email',
-          'We have sent you an email to verify your account. Please check your inbox and follow the verification link.',
-          [
-            {
-              text: 'OK',
-              onPress: () => router.replace('/(auth)/sign-in')
+  async function signUp(email: string, password: string, fullName: string) {
+    try {
+      const { user, profile } = await signUpWithEmail(email, password, fullName);
+      
+      Alert.alert(
+        'Check your email',
+        'We have sent you a confirmation email. Please verify your email address to complete the signup process.',
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              setState({ user: null, profile: null, loading: false });
+              router.replace('/(auth)/sign-in');
             }
-          ]
-        );
+          }
+        ]
+      );
+    } catch (error: any) {
+      console.error('Error signing up:', error);
+      Alert.alert('Error', error.message || 'An unexpected error occurred during sign up');
+      throw error;
+    }
+  }
+
+  async function signIn(email: string, password: string) {
+    try {
+      const { user, profile } = await signInWithEmail(email, password);
+      setState({ user, profile, loading: false });
+      
+      if (profile?.onboarding?.onboardingCompleted) {
+        router.replace('/(tabs)');
       } else {
-        throw new Error('Signup failed: No user data received');
+        router.replace('/(onboarding)/name');
       }
     } catch (error: any) {
-      console.error('Signup error:', error);
+      console.error('Error signing in:', error);
       Alert.alert('Error', error.message || 'An unexpected error occurred');
       throw error;
     }
-  };
+  }
 
-  const signIn = async (email: string, password: string) => {
+  async function logout() {
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-      
-      if (error) throw error;
-      
-      if (data?.session) {
-        console.log('Sign in successful, setting session');
-
-        // Check user profile and onboarding status
-        const { data: profile, error: profileError } = await supabase
-          .from('user_profiles')
-          .select('id, onboarding_completed')
-          .eq('id', data.session.user.id)
-          .single();
-
-        if (profileError && profileError.code !== 'PGRST116') {
-          console.error('Error checking profile:', profileError);
-        }
-
-        // If no profile exists, create one
-        if (!profile) {
-          const { error: createError } = await supabase
-            .from('user_profiles')
-            .insert({
-              id: data.session.user.id,
-              email: data.session.user.email,
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-              onboarding_completed: false
-            });
-
-          if (createError) {
-            console.error('Error creating profile:', createError);
-          }
-          setSession(data.session);
-          router.replace('/(onboarding)/name');
-        } else {
-          setSession(data.session);
-          if (profile.onboarding_completed) {
-            router.replace('/(tabs)');
-          } else {
-            router.replace('/(onboarding)/name');
-          }
-        }
-      }
+      await signOut();
+      setState({ user: null, profile: null, loading: false });
+      router.replace('/(auth)/sign-in');
     } catch (error: any) {
-      console.error('Sign in error:', error);
-      Alert.alert('Error', error.message);
+      console.error('Error signing out:', error);
+      Alert.alert('Error', error.message || 'An unexpected error occurred');
       throw error;
     }
+  }
+
+  const value = {
+    ...state,
+    signUp,
+    signIn,
+    logout,
+    getCurrentUser,
   };
 
-  const signOut = async () => {
-    try {
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
-      setSession(null);
-    } catch (error: any) {
-      Alert.alert('Error', error.message);
-      throw error;
-    }
-  };
-
-  return (
-    <AuthContext.Provider value={{ session, isLoading, signUp, signIn, signOut }}>
-      {!isLoading && children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{!state.loading && children}</AuthContext.Provider>;
 }
 
 export function useAuth() {

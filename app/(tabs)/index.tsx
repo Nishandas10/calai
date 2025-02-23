@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity, Alert } from 'react-native';
 import { useAuth } from '@/context/auth';
-import { supabase } from '@/lib/supabase';
+import { firestore } from '@/lib/firebase';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { Ionicons } from '@expo/vector-icons';
 import { CircularProgress } from '@/components/ui/circular-progress';
 import { Card } from '@/components/ui/card';
@@ -21,35 +22,29 @@ interface DailyNutrition {
 }
 
 export default function DashboardScreen() {
-  const { session } = useAuth();
+  const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [nutrition, setNutrition] = useState<DailyNutrition | null>(null);
   const [showCamera, setShowCamera] = useState(false);
 
   useEffect(() => {
-    fetchOrCreateDailyTargets();
-  }, []);
+    if (user) {
+      fetchOrCreateDailyTargets();
+    }
+  }, [user]);
 
   const calculateDailyTargets = async () => {
     try {
+      if (!user) return null;
+
       // Fetch user's health metrics and goals
-      const { data: healthMetrics } = await supabase
-        .from('user_health_metrics')
-        .select('*')
-        .eq('user_id', session?.user.id)
-        .single();
+      const healthMetricsDoc = await getDoc(doc(firestore, 'user_health_metrics', user.uid));
+      const goalsDoc = await getDoc(doc(firestore, 'user_goals', user.uid));
+      const macroGoalsDoc = await getDoc(doc(firestore, 'user_macro_goals', user.uid));
 
-      const { data: goals } = await supabase
-        .from('user_goals')
-        .select('*')
-        .eq('user_id', session?.user.id)
-        .single();
-
-      const { data: macroGoals } = await supabase
-        .from('user_macro_goals')
-        .select('*')
-        .eq('user_id', session?.user.id)
-        .single();
+      const healthMetrics = healthMetricsDoc.data();
+      const goals = goalsDoc.data();
+      const macroGoals = macroGoalsDoc.data();
 
       if (!healthMetrics || !goals || !macroGoals) return null;
 
@@ -79,59 +74,42 @@ export default function DashboardScreen() {
           break;
       }
 
-      // Calculate macros based on percentages
-      const targetProtein = Math.round((targetCalories * (macroGoals.protein / 100)) / 4);
-      const targetCarbs = Math.round((targetCalories * (macroGoals.carbs / 100)) / 4);
-      const targetFat = Math.round((targetCalories * (macroGoals.fat / 100)) / 9);
-
       return {
         target_calories: targetCalories,
-        target_protein: targetProtein,
-        target_carbs: targetCarbs,
-        target_fat: targetFat,
+        target_protein: macroGoals.protein_target || 0,
+        target_carbs: macroGoals.carbs_target || 0,
+        target_fat: macroGoals.fat_target || 0,
         consumed_calories: 0,
         consumed_protein: 0,
         consumed_carbs: 0,
-        consumed_fat: 0
+        consumed_fat: 0,
       };
     } catch (error) {
-      console.error('Error calculating targets:', error);
+      console.error('Error calculating daily targets:', error);
       return null;
     }
   };
 
   const fetchOrCreateDailyTargets = async () => {
     try {
+      if (!user) return;
+
       const today = new Date().toISOString().split('T')[0];
-      
-      // Try to fetch today's targets
-      const { data: existingTargets } = await supabase
-        .from('daily_nutrition_targets')
-        .select('*')
-        .eq('user_id', session?.user.id)
-        .eq('date', today)
-        .single();
+      const dailyTargetsRef = doc(firestore, 'daily_nutrition', `${user.uid}_${today}`);
+      const dailyTargetsDoc = await getDoc(dailyTargetsRef);
 
-      if (existingTargets) {
-        setNutrition(existingTargets);
+      if (dailyTargetsDoc.exists()) {
+        setNutrition(dailyTargetsDoc.data() as DailyNutrition);
       } else {
-        // Calculate and create new targets
-        const newTargets = await calculateDailyTargets();
-        if (newTargets) {
-          const { data } = await supabase
-            .from('daily_nutrition_targets')
-            .insert({
-              user_id: session?.user.id,
-              ...newTargets
-            })
-            .select()
-            .single();
-
-          if (data) setNutrition(data);
+        const calculatedTargets = await calculateDailyTargets();
+        if (calculatedTargets) {
+          await setDoc(dailyTargetsRef, calculatedTargets);
+          setNutrition(calculatedTargets);
         }
       }
     } catch (error) {
-      console.error('Error fetching nutrition data:', error);
+      console.error('Error fetching daily targets:', error);
+      Alert.alert('Error', 'Failed to load nutrition data');
     } finally {
       setLoading(false);
     }

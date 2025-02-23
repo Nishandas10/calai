@@ -2,30 +2,12 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { Link } from 'expo-router';
 import { useAuth } from '@/context/auth';
-import { supabase } from '@/lib/supabase';
 
 export default function SignIn() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const { signIn } = useAuth();
-
-  // Test Supabase connection
-  const testConnection = async () => {
-    try {
-      const { data, error } = await supabase.auth.getSession();
-      if (error) {
-        console.error('Supabase connection error:', error.message);
-        Alert.alert('Connection Error', 'Could not connect to Supabase');
-      } else {
-        console.log('Supabase connected successfully:', data);
-        Alert.alert('Success', 'Connected to Supabase successfully');
-      }
-    } catch (error) {
-      console.error('Test connection error:', error);
-      Alert.alert('Error', 'Failed to test connection');
-    }
-  };
 
   const handleSignIn = async () => {
     try {

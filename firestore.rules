@@ -1,0 +1,61 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Helper function to check if user is accessing their own data
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Profiles collection rules
+    match /profiles/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    // User onboarding rules
+    match /user_onboarding/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    // Food logs rules
+    match /food_logs/{logId} {
+      allow read: if isAuthenticated() && resource.data.user_id == request.auth.uid;
+      allow create: if isAuthenticated() && request.resource.data.user_id == request.auth.uid;
+      allow update, delete: if isAuthenticated() && resource.data.user_id == request.auth.uid;
+    }
+
+    // User health metrics rules
+    match /user_health_metrics/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    // User goals rules
+    match /user_goals/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    // User macro goals rules
+    match /user_macro_goals/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    // Daily nutrition rules
+    match /daily_nutrition/{docId} {
+      allow read: if isAuthenticated() && resource.data.user_id == request.auth.uid;
+      allow create: if isAuthenticated() && request.resource.data.user_id == request.auth.uid;
+      allow update, delete: if isAuthenticated() && resource.data.user_id == request.auth.uid;
+    }
+
+    // Scanned products rules
+    match /scanned_products/{productId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
+  }
+} 

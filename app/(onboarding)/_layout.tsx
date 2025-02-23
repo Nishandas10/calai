@@ -1,25 +1,21 @@
 import React, { useEffect } from 'react';
 import { Stack, router } from 'expo-router';
 import { OnboardingProvider, useOnboarding } from '@/context/onboarding';
-import { supabase } from '@/lib/supabase';
+import { auth, firestore } from '@/lib/firebase';
+import { doc, getDoc } from 'firebase/firestore';
 
 function OnboardingLayoutInner() {
   useEffect(() => {
     const checkOnboardingStatus = async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
+        const user = auth.currentUser;
         if (!user) return;
 
-        const { data, error } = await supabase
-          .from('user_onboarding')
-          .select('onboarding_completed')
-          .eq('user_id', user.id)
-          .single();
-
-        if (error) throw error;
+        const onboardingDoc = await getDoc(doc(firestore, 'user_onboarding', user.uid));
+        const onboardingData = onboardingDoc.data();
 
         // If onboarding is completed, show the completed screen
-        if (data?.onboarding_completed) {
+        if (onboardingData?.onboarding_completed) {
           router.replace('/(onboarding)/completed');
         }
       } catch (error) {

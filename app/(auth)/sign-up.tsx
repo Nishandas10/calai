@@ -2,16 +2,19 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import { Link } from 'expo-router';
 import { useAuth } from '@/context/auth';
+import { useRouter } from 'expo-router';
 
 export default function SignUp() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [fullName, setFullName] = useState('');
   const [loading, setLoading] = useState(false);
   const { signUp } = useAuth();
+  const router = useRouter();
 
   const handleSignUp = async () => {
-    if (!email || !password) {
+    if (!email || !password || !fullName) {
       Alert.alert('Error', 'Please fill in all fields');
       return;
     }
@@ -23,9 +26,23 @@ export default function SignUp() {
 
     try {
       setLoading(true);
-      await signUp(email, password);
-    } catch (error) {
+      await signUp(email, password, fullName);
+      Alert.alert(
+        'Check your email',
+        'We have sent you a confirmation email. Please verify your email address to complete the signup process.',
+        [
+          {
+            text: 'OK',
+            onPress: () => router.replace('/(auth)/sign-in')
+          }
+        ]
+      );
+    } catch (error: any) {
       console.error('Sign up error:', error);
+      Alert.alert(
+        'Sign up error',
+        error.message || 'An unexpected error occurred during sign up'
+      );
     } finally {
       setLoading(false);
     }
@@ -35,6 +52,14 @@ export default function SignUp() {
     <View style={styles.container}>
       <Text style={styles.title}>Create Account</Text>
       <View style={styles.form}>
+        <TextInput
+          style={styles.input}
+          placeholder="Full Name"
+          value={fullName}
+          onChangeText={setFullName}
+          autoCapitalize="words"
+          editable={!loading}
+        />
         <TextInput
           style={styles.input}
           placeholder="Email"

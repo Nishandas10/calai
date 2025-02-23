@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity } from 'react-native';
 import { Card } from '@/components/ui/card';
-import { supabase } from '@/lib/supabase';
+import { firestore, auth } from '@/lib/firebase';
 import { useAuth } from '@/context/auth';
 import { FoodAnalysis } from '@/lib/services/food-analysis';
 import FoodAnalysisCard from './FoodAnalysisCard';
+import { collection, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
 
 interface FoodLog {
   id: string;
@@ -15,7 +16,7 @@ interface FoodLog {
 }
 
 export default function RecentFoodLogs() {
-  const { session } = useAuth();
+  const { user } = useAuth();
   const [foodLogs, setFoodLogs] = useState<FoodLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedLog, setSelectedLog] = useState<FoodLog | null>(null);
@@ -25,18 +26,24 @@ export default function RecentFoodLogs() {
   }, []);
 
   const fetchRecentFoodLogs = async () => {
-    if (!session?.user?.id) return;
+    if (!user?.uid) return;
 
     try {
-      const { data, error } = await supabase
-        .from('food_logs')
-        .select('*')
-        .eq('user_id', session.user.id)
-        .order('created_at', { ascending: false })
-        .limit(10);
+      const foodLogsRef = collection(firestore, 'food_logs');
+      const q = query(
+        foodLogsRef,
+        where('user_id', '==', user.uid),
+        orderBy('created_at', 'desc'),
+        limit(10)
+      );
 
-      if (error) throw error;
-      setFoodLogs(data || []);
+      const querySnapshot = await getDocs(q);
+      const logs = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      } as FoodLog));
+
+      setFoodLogs(logs);
     } catch (error) {
       console.error('Error fetching food logs:', error);
     } finally {
@@ -89,7 +96,7 @@ export default function RecentFoodLogs() {
           <Card style={styles.logCard}>
             <View style={styles.logHeader}>
               <Image 
-                source={{ uri: supabase.storage.from('food-images').getPublicUrl(log.image_path).data.publicUrl }} 
+                source={{ uri: log.image_path }} 
                 style={styles.foodImage} 
               />
               <View style={styles.logInfo}>

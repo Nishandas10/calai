@@ -3,15 +3,16 @@ import { View, TouchableOpacity, StyleSheet, Modal, Alert, Image, Animated, Text
 import { Camera, CameraView as ExpoCameraView, useCameraPermissions, BarcodeScanningResult } from 'expo-camera';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/context/auth';
-import { uploadFoodImage } from '@/lib/services/storage';
 import { analyzeFoodImage, type FoodAnalysis } from '@/lib/services/food-analysis';
 import { getProductByBarcode, saveProductToDatabase } from '@/lib/services/food-database';
 import * as ImageManipulator from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
-import { supabase } from '@/lib/supabase';
-import type { FlashMode } from 'expo-camera';
 import { router } from 'expo-router';
+import { firestore, auth } from '@/lib/firebase';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import type { FlashMode } from 'expo-camera';
 
 interface CameraViewProps {
   isVisible: boolean;
@@ -19,7 +20,7 @@ interface CameraViewProps {
 }
 
 export function CameraView({ isVisible, onClose }: CameraViewProps) {
-  const { session } = useAuth();
+  const { user } = useAuth();
   const [permission, requestPermission] = useCameraPermissions();
   const [facing, setFacing] = useState<'back' | 'front'>('back');
   const [isCapturing, setIsCapturing] = useState(false);
@@ -35,6 +36,7 @@ export function CameraView({ isVisible, onClose }: CameraViewProps) {
   const lastScanTime = useRef<number>(0);
   const scanTimeout = useRef<NodeJS.Timeout>();
   const scanAttempts = useRef<number>(0);
+  const lastScannedTime = useRef<number>(0);
 
   // Reset scanner state when visibility changes
   useEffect(() => {
@@ -157,32 +159,50 @@ export function CameraView({ isVisible, onClose }: CameraViewProps) {
     }
   };
 
+  const uploadFoodImage = async (uri: string, userId: string): Promise<string> => {
+    try {
+      const response = await fetch(uri);
+      const blob = await response.blob();
+      
+      const storage = getStorage();
+      const imagePath = `food-images/${userId}/${new Date().toISOString()}.jpg`;
+      const imageRef = ref(storage, imagePath);
+      
+      await uploadBytes(imageRef, blob);
+      const downloadURL = await getDownloadURL(imageRef);
+      
+      return downloadURL;
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      throw new Error('Failed to upload image');
+    }
+  };
+
   const handleAccept = async () => {
-    if (!previewImage || !session?.user?.id) return;
+    if (!previewImage || !user?.uid) return;
 
     try {
       setIsCapturing(true);
       
-      // Upload to Supabase storage
-      const imageUrl = await uploadFoodImage(previewImage, session.user.id);
+      // Upload to Firebase storage
+      const imageUrl = await uploadFoodImage(previewImage, user.uid);
       console.log('Image uploaded successfully:', imageUrl);
-
-      // Get the relative path from the full URL
-      const url = new URL(imageUrl);
-      const path = url.pathname.split('/').slice(-2).join('/');
       
-      // Ensure we have a valid path
-      if (!path) {
-        throw new Error('Failed to get valid image path');
-      }
-      
-      setImagePath(path);
+      setImagePath(imageUrl);
 
       // Analyze the food image
-      const foodAnalysis = await analyzeFoodImage(path);
+      const foodAnalysis = await analyzeFoodImage(imageUrl);
       setAnalysis(foodAnalysis);
 
-      // Note: We don't need to save to food_logs here as it's already done in the Edge Function
+      // Save to Firestore
+      const foodLogRef = doc(firestore, 'food_logs', `${user.uid}_${new Date().toISOString()}`);
+      await setDoc(foodLogRef, {
+        user_id: user.uid,
+        image_path: imageUrl,
+        ai_analysis: foodAnalysis,
+        user_adjustments: null,
+        created_at: serverTimestamp()
+      });
       
       // Refresh the index page after successful analysis
       router.replace('/(tabs)');
@@ -232,10 +252,10 @@ export function CameraView({ isVisible, onClose }: CameraViewProps) {
     const SCAN_DELAY = 2000; // 2 seconds between scans
     const MAX_ATTEMPTS = 3; // Maximum number of scan attempts before showing error
     
-    if (scannedBarcode || !isScanningBarcode || !session?.user?.id) return;
-    if (now - lastScanTime.current < SCAN_DELAY) return;
+    if (scannedBarcode || !isScanningBarcode || !user?.uid) return;
+    if (now - lastScannedTime.current < SCAN_DELAY) return;
     
-    lastScanTime.current = now;
+    lastScannedTime.current = now;
     setScannedBarcode(data);
     setIsScanning(true);
     scanAttempts.current += 1;
@@ -247,54 +267,6 @@ export function CameraView({ isVisible, onClose }: CameraViewProps) {
     
     try {
       const productData = await getProductByBarcode(data);
-      
-      // Download and store the product image if available
-      let storedImagePath = null;
-      if (productData.product.image_url) {
-        try {
-          // Download the image to local filesystem first
-          const filename = `${Date.now()}.jpg`;
-          const localUri = `${FileSystem.cacheDirectory}${filename}`;
-          
-          const downloadResult = await FileSystem.downloadAsync(
-            productData.product.image_url,
-            localUri
-          );
-          
-          if (downloadResult.status === 200) {
-            // Process the image with ImageManipulator
-            const manipResult = await ImageManipulator.manipulateAsync(
-              localUri,
-              [{ resize: { width: 1080 } }],
-              { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG }
-            );
-            
-            // Upload the processed image to Supabase storage and get the path
-            const uploadedUrl = await uploadFoodImage(manipResult.uri, session.user.id);
-            // Extract just the path part from the full URL
-            const urlObj = new URL(uploadedUrl);
-            storedImagePath = urlObj.pathname.split('/').slice(-2).join('/');
-            
-            // Clean up the temporary file
-            await FileSystem.deleteAsync(localUri, { idempotent: true });
-            await FileSystem.deleteAsync(manipResult.uri, { idempotent: true });
-            
-            console.log('Product image stored successfully:', storedImagePath);
-          }
-        } catch (imageError) {
-          console.error('Error storing product image:', imageError);
-          // If we fail to store the image, we'll use a default placeholder image
-          storedImagePath = 'default/placeholder-food.jpg';
-        }
-      } else {
-        // If no image URL is available, use a default placeholder image
-        storedImagePath = 'default/placeholder-food.jpg';
-      }
-      
-      const savedProduct = await saveProductToDatabase(productData);
-      
-      // Reset scan attempts on success
-      scanAttempts.current = 0;
       
       // Convert product data to FoodAnalysis format
       const analysis: FoodAnalysis = {
@@ -317,39 +289,24 @@ export function CameraView({ isVisible, onClose }: CameraViewProps) {
       
       setAnalysis(analysis);
       
-      // Ensure we have a valid image path before saving to food_logs
-      const finalImagePath = storedImagePath || 'default/placeholder-food.jpg';
-      setImagePath(finalImagePath);
-      setPreviewImage(storedImagePath 
-        ? supabase.storage.from('food-images').getPublicUrl(storedImagePath).data.publicUrl 
-        : productData.product.image_url
-      );
+      // Use product image URL directly or a placeholder
+      const imageUrl = productData.product.image_url || 'https://via.placeholder.com/300';
+      setImagePath(imageUrl);
+      setPreviewImage(imageUrl);
       
-      // Save to food_logs table with guaranteed image_path
-      try {
-        const { error: logError } = await supabase
-          .from('food_logs')
-          .insert({
-            user_id: session.user.id,
-            image_path: finalImagePath,
-            ai_analysis: analysis,
-            user_adjustments: null,
-            created_at: new Date().toISOString()
-          });
-
-        if (logError) {
-          console.error('Error saving to food logs:', logError);
-          throw logError;
-        }
-        
-        // Refresh the index page and close camera after successful save
-        router.replace('/(tabs)');
-        handleDone();
-        
-      } catch (logError) {
-        console.error('Error saving to food logs:', logError);
-        Alert.alert('Error', 'Failed to save food log. Please try again.');
-      }
+      // Save to Firestore
+      const foodLogRef = doc(firestore, 'food_logs', `${user.uid}_${new Date().toISOString()}`);
+      await setDoc(foodLogRef, {
+        user_id: user.uid,
+        image_path: imageUrl,
+        ai_analysis: analysis,
+        user_adjustments: null,
+        created_at: serverTimestamp()
+      });
+      
+      // Refresh the index page and close camera after successful save
+      router.replace('/(tabs)');
+      handleDone();
       
     } catch (error) {
       // Only show error dialog if we've reached max attempts

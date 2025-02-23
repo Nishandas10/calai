@@ -1,0 +1,88 @@
+// This is your Prisma schema file
+generator client {
+    provider        = "prisma-client-js"
+    previewFeatures = ["multiSchema"]
+}
+
+datasource db {
+    provider  = "postgresql"
+    url       = env("DATABASE_URL")
+    directUrl = env("DIRECT_URL")
+    schemas   = ["public", "auth"]
+}
+
+model Profile {
+    id         String   @id @db.Uuid
+    user_id    String   @unique @db.Uuid
+    email      String   @unique
+    full_name  String?
+    avatar_url String?
+    onboarding Json     @default("{\"onboardingCompleted\": false}")
+    created_at DateTime @default(now())
+    updated_at DateTime @updatedAt
+    user       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+    @@map("profiles")
+    @@schema("public")
+}
+
+// Firebase Auth Schema
+model User {
+    id                 String    @id @db.Uuid
+    email              String?   @unique
+    created_at         DateTime  @default(now())
+    updated_at         DateTime  @updatedAt
+    phone              String?   @unique
+    confirmed_at       DateTime?
+    email_confirmed_at DateTime?
+    last_sign_in_at    DateTime?
+    raw_app_meta_data  Json?
+    raw_user_meta_data Json?
+    profile            Profile?
+
+    @@map("users")
+    @@schema("auth")
+}
+
+model Identity {
+    id              String    @id @default(uuid()) @db.Uuid
+    user_id         String    @db.Uuid
+    identity_data   Json
+    provider        String
+    last_sign_in_at DateTime?
+    created_at      DateTime  @default(now())
+    updated_at      DateTime  @updatedAt
+
+    @@unique([provider, user_id])
+    @@map("identities")
+    @@schema("auth")
+}
+
+model Session {
+    id         String    @id @default(uuid()) @db.Uuid
+    user_id    String    @db.Uuid
+    created_at DateTime  @default(now())
+    updated_at DateTime  @updatedAt
+    factor_id  String?
+    aal        String?   @db.VarChar(255)
+    not_after  DateTime?
+
+    @@map("sessions")
+    @@schema("auth")
+}
+
+model RefreshToken {
+    id         String   @id @default(uuid()) @db.Uuid
+    token      String   @unique
+    user_id    String   @db.Uuid
+    revoked    Boolean?
+    created_at DateTime @default(now())
+    updated_at DateTime @updatedAt
+    parent     String?
+    session_id String?
+
+    @@map("refresh_tokens")
+    @@schema("auth")
+}
+
+// Add any additional models specific to your app below 

@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { Card } from '@/components/ui/card';
-import { supabase } from '@/lib/supabase';
+import { firestore, auth } from '@/lib/firebase';
 import { useAuth } from '@/context/auth';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 
 interface Ingredient {
   name: string;
@@ -40,7 +41,7 @@ interface FoodAnalysisCardProps {
 }
 
 export default function FoodAnalysisCard({ analysis: initialAnalysis, imagePath, onSave }: FoodAnalysisCardProps) {
-  const { session } = useAuth();
+  const { user } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -221,24 +222,21 @@ export default function FoodAnalysisCard({ analysis: initialAnalysis, imagePath,
   };
 
   const handleSave = async () => {
-    if (!session?.user?.id) {
+    if (!user?.uid) {
       Alert.alert('Error', 'You must be logged in to save adjustments');
       return;
     }
 
     setIsSaving(true);
     try {
-      const { error: saveError } = await supabase
-        .from('food_logs')
-        .upsert({
-          user_id: session.user.id,
-          image_path: imagePath,
-          ai_analysis: initialAnalysis,
-          user_adjustments: analysis,
-          updated_at: new Date().toISOString(),
-        });
-
-      if (saveError) throw saveError;
+      const foodLogRef = doc(firestore, 'food_logs', `${user.uid}_${new Date().toISOString()}`);
+      await setDoc(foodLogRef, {
+        user_id: user.uid,
+        image_path: imagePath,
+        ai_analysis: initialAnalysis,
+        user_adjustments: analysis,
+        updated_at: serverTimestamp(),
+      }, { merge: true });
 
       setIsEditing(false);
       onSave?.();

@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { prisma } from '@/lib/prisma';
+import { useAuth } from '@/context/auth';
 
 type Goal = string;
 
@@ -218,9 +219,11 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
 
   const saveOnboardingData = async (aiMacros?: OnboardingData['aiMacros'], standardMacros?: OnboardingData['standardMacros']) => {
     try {
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      if (userError) throw userError;
-      if (!user?.id || !user?.email) throw new Error('Invalid user data');
+      const { session } = useAuth();
+      if (!session?.user) throw new Error('No authenticated user');
+      const userId = session.user.id;
+      const userEmail = session.user.email;
+      if (!userId || !userEmail) throw new Error('Invalid user data');
 
       console.log('Current state before save:', data);
       console.log('Current goal before conversion:', data.usersGoal);
@@ -228,48 +231,66 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
       const dbGoalValue = goalToDbValue(data.usersGoal);
       console.log('Converted goal value:', dbGoalValue);
 
-      // Prepare the data to be saved
-      const onboardingData = {
-        user_id: user.id,
-        name: data.name,
-        gender: data.gender,
-        birthday: data.birthday?.toISOString(),
-        activity_level: data.activityLevel,
-        height_cm: data.unit === 'metric' ? data.height : convertToMetric.height(data.height!),
-        weight_kg: data.unit === 'metric' ? data.weight : convertToMetric.weight(data.weight!),
-        users_goal: dbGoalValue,
-        target_weight_kg: data.unit === 'metric' ? data.targetWeight : convertToMetric.weight(data.targetWeight!),
-        weekly_pace: data.weeklyPace,
-        use_auto_macros: data.useAutoMacros,
-        onboarding_completed: true,
-        updated_at: new Date().toISOString(),
-        
-        // Add macros data
-        ai_calories: aiMacros?.calories,
-        ai_protein: aiMacros?.protein,
-        ai_carbs: aiMacros?.carbs,
-        ai_fat: aiMacros?.fat,
-        
-        standard_calories: standardMacros?.calories,
-        standard_protein: standardMacros?.protein,
-        standard_carbs: standardMacros?.carbs,
-        standard_fat: standardMacros?.fat,
-      };
+      // First, ensure user profile exists
+      const userProfile = await prisma.userProfile.upsert({
+        where: { authUserId: userId },
+        update: {},
+        create: {
+          authUserId: userId,
+          email: userEmail,
+          fullName: data.name || undefined,
+        },
+      });
 
-      console.log('Final data being saved:', onboardingData);
+      // Then, create or update onboarding data
+      const onboardingData = await prisma.userOnboarding.upsert({
+        where: { userId: userProfile.authUserId },
+        update: {
+          name: data.name || '',
+          gender: data.gender || undefined,
+          birthday: data.birthday || new Date(),
+          activityLevel: data.activityLevel || 1,
+          heightCm: data.unit === 'metric' ? data.height! : convertToMetric.height(data.height!),
+          weightKg: data.unit === 'metric' ? data.weight! : convertToMetric.weight(data.weight!),
+          usersGoal: dbGoalValue || '',
+          targetWeightKg: data.unit === 'metric' ? data.targetWeight! : convertToMetric.weight(data.targetWeight!),
+          weeklyPace: data.weeklyPace || 0,
+          useAutoMacros: data.useAutoMacros,
+          onboardingCompleted: true,
+          aiCalories: aiMacros?.calories,
+          aiProtein: aiMacros?.protein,
+          aiCarbs: aiMacros?.carbs,
+          aiFat: aiMacros?.fat,
+          standardCalories: standardMacros?.calories,
+          standardProtein: standardMacros?.protein,
+          standardCarbs: standardMacros?.carbs,
+          standardFat: standardMacros?.fat,
+        },
+        create: {
+          userId: userProfile.authUserId,
+          name: data.name || '',
+          gender: data.gender || undefined,
+          birthday: data.birthday || new Date(),
+          activityLevel: data.activityLevel || 1,
+          heightCm: data.unit === 'metric' ? data.height! : convertToMetric.height(data.height!),
+          weightKg: data.unit === 'metric' ? data.weight! : convertToMetric.weight(data.weight!),
+          usersGoal: dbGoalValue || '',
+          targetWeightKg: data.unit === 'metric' ? data.targetWeight! : convertToMetric.weight(data.targetWeight!),
+          weeklyPace: data.weeklyPace || 0,
+          useAutoMacros: data.useAutoMacros,
+          onboardingCompleted: true,
+          aiCalories: aiMacros?.calories,
+          aiProtein: aiMacros?.protein,
+          aiCarbs: aiMacros?.carbs,
+          aiFat: aiMacros?.fat,
+          standardCalories: standardMacros?.calories,
+          standardProtein: standardMacros?.protein,
+          standardCarbs: standardMacros?.carbs,
+          standardFat: standardMacros?.fat,
+        },
+      });
 
-      const { error: onboardingError } = await supabase
-        .from('user_onboarding')
-        .upsert(onboardingData, {
-          onConflict: 'user_id'
-        });
-
-      if (onboardingError) {
-        console.error('Onboarding error:', onboardingError);
-        throw onboardingError;
-      }
-
-      console.log('Save successful');
+      console.log('Save successful:', onboardingData);
 
     } catch (error: any) {
       console.error('Error saving onboarding data:', error);

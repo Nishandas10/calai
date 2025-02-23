@@ -5,8 +5,8 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import Svg, { Circle } from 'react-native-svg';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { useOnboarding } from '@/context/onboarding';
-import { supabase } from '@/lib/supabase';
 import { theme } from '@/constants/theme';
+import { auth } from '@/lib/firebase';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const CIRCLE_SIZE = (SCREEN_WIDTH - 100) / 2; // Slightly smaller circles
@@ -36,15 +36,15 @@ export default function CompletedScreen() {
       setLoading(true);
       setError(null);
 
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error('No session found');
+      const user = auth.currentUser;
+      if (!user) throw new Error('No user found');
 
       console.log('Sending request with data:', data);
       
-      const response = await fetch(`${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/analyze-macros`, {
+      const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/analyze-macros`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${session.access_token}`,
+          'Authorization': `Bearer ${await user.getIdToken()}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ userData: data }),

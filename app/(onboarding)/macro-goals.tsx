@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert } from 'react-native';
 import { router } from 'expo-router';
 import { useOnboarding } from '@/context/onboarding';
-import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/context/auth';
 import { UserModel } from '@/lib/models/user';
